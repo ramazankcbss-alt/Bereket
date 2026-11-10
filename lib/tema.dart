@@ -3,29 +3,31 @@ import 'package:flutter/material.dart';
 /// Koyu lacivert, oyun ekranı havasında tema: parlak kartlar, renkli
 /// kabartma butonlar, üstte sayaç hapları.
 class Renk {
-  static const zemin = Color(0xFF070C18);
-  static const zeminAlt = Color(0xFF0B1324);
-  static const kart = Color(0xFF111A2E);
-  static const kartAcik = Color(0xFF17223A);
-  static const cizgi = Color(0xFF26324D);
-  static const yazi = Color(0xFFFFFFFF);
-  static const soluk = Color(0xFFB7C2DA);
+  // Açık tema: krem-beyaz zemin, beyaz kartlar, koyu yazı.
+  static const zemin = Color(0xFFF3F5EF);
+  static const zeminAlt = Color(0xFFEEF1EA);
+  static const kart = Color(0xFFFFFFFF);
+  static const kartAcik = Color(0xFFEEF2F6);
+  static const cizgi = Color(0xFFDCE2E8);
+  static const yazi = Color(0xFF1A2230);
+  static const soluk = Color(0xFF5F6B7D);
 
-  static const altin = Color(0xFFF5C451);
-  static const yesil = Color(0xFF5DBB4F);
-  static const yesilKoyu = Color(0xFF3E8E35);
-  static const mavi = Color(0xFF4C7DD9);
-  static const maviKoyu = Color(0xFF2F5BB0);
-  static const mor = Color(0xFF7C5CE0);
-  static const morKoyu = Color(0xFF5A3DB8);
-  static const kirmizi = Color(0xFFE5534B);
-  static const turuncu = Color(0xFFF09A3E);
-  static const turkuaz = Color(0xFF2BB3A8);
-  static const gri = Color(0xFF6B7690);
+  // Vurgu renkleri beyaz üstünde okunacak koyulukta.
+  static const altin = Color(0xFFB7800C);
+  static const yesil = Color(0xFF3E9B35);
+  static const yesilKoyu = Color(0xFF2E7A27);
+  static const mavi = Color(0xFF3F6FCC);
+  static const maviKoyu = Color(0xFF2C55A8);
+  static const mor = Color(0xFF6E4FD6);
+  static const morKoyu = Color(0xFF5235B5);
+  static const kirmizi = Color(0xFFD6453D);
+  static const turuncu = Color(0xFFDD7F22);
+  static const turkuaz = Color(0xFF1E9C92);
+  static const gri = Color(0xFF8A94A6);
 }
 
 ThemeData temaOlustur() {
-  final cs = const ColorScheme.dark().copyWith(
+  final cs = const ColorScheme.light().copyWith(
     primary: Renk.mavi,
     onPrimary: Colors.white,
     secondary: Renk.yesil,
@@ -46,7 +48,7 @@ ThemeData temaOlustur() {
   );
   return ThemeData(
     useMaterial3: true,
-    brightness: Brightness.dark,
+    brightness: Brightness.light,
     colorScheme: cs,
     scaffoldBackgroundColor: Renk.zemin,
     dividerColor: Renk.cizgi,
@@ -84,9 +86,11 @@ ThemeData temaOlustur() {
     ),
     chipTheme: ChipThemeData(
       backgroundColor: Renk.kart,
-      selectedColor: Renk.maviKoyu,
+      selectedColor: Renk.mavi,
       side: const BorderSide(color: Renk.cizgi),
       labelStyle: const TextStyle(color: Renk.yazi, fontSize: 14),
+      secondaryLabelStyle: const TextStyle(
+          color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       showCheckmark: false,
     ),
@@ -181,6 +185,9 @@ class Panel extends StatelessWidget {
         color: Renk.kart,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: kenarRengi ?? Renk.cizgi, width: 1.2),
+        boxShadow: const [
+          BoxShadow(color: Color(0x14000000), blurRadius: 10, offset: Offset(0, 3)),
+        ],
       ),
       child: onTap == null
           ? ic
@@ -306,7 +313,7 @@ class SayacHapi extends StatelessWidget {
         height: 46,
         padding: const EdgeInsets.only(left: 4, right: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFF0A1226),
+          color: Renk.kart,
           borderRadius: BorderRadius.circular(23),
           border: Border.all(color: renk, width: 2),
         ),
@@ -468,7 +475,7 @@ class BuyukKart extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [renk2.withValues(alpha: 0.55), Renk.kart],
+                colors: [renk1.withValues(alpha: 0.22), Renk.kart],
               ),
             ),
             child: Stack(
@@ -540,8 +547,10 @@ class Etiket extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
       ),
       child: Text('${simge == null ? '' : '$simge '}$yazi',
-          style: const TextStyle(
-              color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
+          style: TextStyle(
+              color: renk.computeLuminance() > 0.55 ? Renk.yazi : Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w700)),
     );
   }
 }
@@ -730,7 +739,7 @@ class Cubuk extends StatelessWidget {
     return Container(
       height: 30,
       decoration: BoxDecoration(
-        color: const Color(0xFF0A1226),
+        color: Renk.kartAcik,
         borderRadius: BorderRadius.circular(15),
         border: Border.all(color: Renk.cizgi, width: 2),
       ),
@@ -951,9 +960,9 @@ class KareMenu extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [r.withValues(alpha: 0.42), r.withValues(alpha: 0.12)],
+              colors: [r.withValues(alpha: 0.28), r.withValues(alpha: 0.08)],
             ),
-            border: Border.all(color: r.withValues(alpha: 0.55), width: 1.2),
+            border: Border.all(color: r.withValues(alpha: 0.45), width: 1.2),
           ),
           child: Stack(
             children: [
@@ -967,7 +976,7 @@ class KareMenu extends StatelessWidget {
                       height: 42,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.22),
+                        color: Colors.white.withValues(alpha: 0.75),
                         borderRadius: BorderRadius.circular(13),
                       ),
                       child: Text(o.simge, style: const TextStyle(fontSize: 24)),
@@ -982,8 +991,7 @@ class KareMenu extends StatelessWidget {
                     Text(o.alt,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            color: Renk.yazi.withValues(alpha: 0.7), fontSize: 11.5, height: 1.2)),
+                        style: const TextStyle(color: Renk.soluk, fontSize: 11.5, height: 1.2)),
                   ],
                 ),
               ),
