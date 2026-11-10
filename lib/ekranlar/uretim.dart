@@ -383,17 +383,54 @@ Future<void> sayacFormu(BuildContext context, Durum durum, {Kayit? sayac}) {
 }
 
 class UretimSayfasi extends StatefulWidget {
-  const UretimSayfasi({super.key, required this.durum});
+  const UretimSayfasi({super.key, required this.durum, this.sekme, this.yil});
   final Durum durum;
+
+  /// Boşsa ana sayfa (özet + liste); doluysa o bölüm: Ekimler, Masraflar, Ürünler, Stok.
+  final String? sekme;
+  final int? yil;
 
   @override
   State<UretimSayfasi> createState() => _UretimSayfasiState();
 }
 
 class _UretimSayfasiState extends State<UretimSayfasi> {
-  int _yil = DateTime.now().year;
+  late int _yil = widget.yil ?? DateTime.now().year;
   String _kisi = 'Hepsi';
-  String _sekme = 'Ekimler';
+  String get _sekme => widget.sekme ?? '';
+
+  /// Ana sayfadaki bölüm listesi.
+  Widget _menu(BuildContext context, Veriler v, int ekimSayisi, double dekar) {
+    final giderler = v.giderler.where((g) => g.s('alan') != 'ev' && g.yil == _yil).toList();
+    final giderTop = giderler.fold(0.0, (a, g) => a + g.n('tutar'));
+    final urunSayisi = {
+      for (final e in v.ekimler)
+        if (e.t('yil') == _yil) e.s('urun')
+    }.length;
+    final stokSayisi = v.stoklar.where((x) => v.stokKalan(x.id) > 0).length;
+    Widget satir(String simge, String baslik, String alt, String sekme) => ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+          leading: Text(simge, style: const TextStyle(fontSize: 26)),
+          title: Text(baslik, style: yaziKalin),
+          subtitle: Text(alt, style: yaziSoluk),
+          trailing: const Icon(Icons.chevron_right, color: Renk.soluk),
+          onTap: () => git(context, UretimSayfasi(durum: durum, sekme: sekme, yil: _yil)),
+        );
+    return Panel(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      child: Column(
+        children: [
+          satir('🌱', 'Ekimler', '$ekimSayisi ekim · ${sayi(dekar)} dekar', 'Ekimler'),
+          const Divider(height: 1),
+          satir('🧾', 'Masraflar', '${giderler.length} kayıt · ${tl0(giderTop)}', 'Masraflar'),
+          const Divider(height: 1),
+          satir('🌾', 'Ürünler', '$urunSayisi ürün · maliyet ve kâr', 'Ürünler'),
+          const Divider(height: 1),
+          satir('📦', 'Ortak Stok', stokSayisi == 0 ? 'Toplu alımlar' : '$stokSayisi stokta ürün var', 'Stok'),
+        ],
+      ),
+    );
+  }
 
   /// Masraf Ekle: ne eklendiğini sorar.
   Future<void> _masrafSec(BuildContext context) async {
@@ -438,9 +475,13 @@ class _UretimSayfasiState extends State<UretimSayfasi> {
   @override
   Widget build(BuildContext context) {
     return Sayfa(
-      baslik: 'Üretim Merkezi',
+      baslik: widget.sekme == 'Stok' ? 'Ortak Stok' : (widget.sekme ?? 'Üretim Merkezi'),
       durum: durum,
-      fab: ekleButonu('Masraf Ekle', () => _masrafSec(context)),
+      fab: switch (_sekme) {
+        'Ekimler' => ekleButonu('Ekim Gir', () => ekimFormu(context, durum, yil: _yil)),
+        'Stok' => ekleButonu('Toplu Alım', () => stokFormu(context, durum)),
+        _ => ekleButonu('Masraf Ekle', () => _masrafSec(context)),
+      },
       builder: (context, v) {
         final yillar = v.yillar(DateTime.now().year);
         final kisiler = ['Hepsi', ...v.sahipler()];
@@ -461,6 +502,7 @@ class _UretimSayfasiState extends State<UretimSayfasi> {
             onSec: (s) => setState(() => _yil = int.parse(s)),
           ),
           const SizedBox(height: 8),
+          if (widget.sekme == null) ...[
           // 2) Sezon özeti ve ana işler.
           Panel(
             child: Column(
@@ -523,29 +565,27 @@ class _UretimSayfasiState extends State<UretimSayfasi> {
               ],
             ),
           ),
-          const SizedBox(height: 4),
-          // 3) Ne görmek istiyorsun.
-          SecimSatiri(
-            secenekler: const ['Ekimler', 'Masraflar', 'Ürünler', 'Stok'],
-            secili: _sekme,
-            onSec: (s) => setState(() => _sekme = s),
-          ),
-          if (_sekme != 'Stok' && kisiler.length > 2) ...[
-            const SizedBox(height: 6),
-            SecimSatiri(
-              secenekler: kisiler,
-              secili: kisiler.contains(_kisi) ? _kisi : 'Hepsi',
-              onSec: (s) => setState(() => _kisi = s),
+            const SizedBox(height: 4),
+            _menu(context, v, ekimler.length, dekar),
+          ] else if (_sekme != 'Stok' && kisiler.length > 2)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: DropdownButtonFormField<String>(
+                key: ValueKey('kisi:$_kisi'),
+                initialValue: kisiler.contains(_kisi) ? _kisi : 'Hepsi',
+                isExpanded: true,
+                dropdownColor: Renk.kartAcik,
+                decoration: const InputDecoration(labelText: 'Kişi'),
+                items: [for (final k in kisiler) DropdownMenuItem(value: k, child: Text(k))],
+                onChanged: (k) => setState(() => _kisi = k ?? 'Hepsi'),
+              ),
             ),
-          ],
-          const SizedBox(height: 10),
           if (_sekme == 'Ekimler') ...[
             if (ekimler.isEmpty)
               BosDurum(
                 simge: '🌱',
-                yazi: '$_yil için ekim yok. Ekimi girin, giderler tarlaya göre kendiliğinden dağıtılır.',
-                butonYazi: 'Ekim Gir',
-                onTap: () => ekimFormu(context, durum, yil: _yil),
+                yazi: '$_yil için ekim yok. Alttaki "Ekim Gir" ile girin; '
+                    'giderler tarlaya göre kendiliğinden dağıtılır.',
               ),
             for (final o in ekimler) _ekimKarti(context, v, o),
           ],

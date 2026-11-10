@@ -122,17 +122,10 @@ List<Widget> stokSekmesi(BuildContext context, Durum durum, Veriler v) {
       return b.t('tarih').compareTo(a.t('tarih'));
     });
   return [
-    Buton(
-      yazi: 'Toplu Alım Ekle',
-      renk: ButonRenk.yesil,
-      ikon: Icons.inventory_2_outlined,
-      onTap: () => stokFormu(context, durum),
-    ),
-    const SizedBox(height: 10),
     if (liste.isEmpty)
       const BosDurum(
         simge: '📦',
-        yazi: 'Topluca aldığınız gübre, tohum, ilaç, mazotu buraya girin. '
+        yazi: 'Topluca aldığınız gübre, tohum, ilaç, mazotu "Toplu Alım" ile girin. '
             'Herkes kullandığını girdikçe ana depodan düşer, kalan burada görünür.',
       ),
     for (final s in liste) _stokKarti(context, durum, v, s),
