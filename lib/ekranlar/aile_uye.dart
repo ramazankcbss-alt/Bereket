@@ -116,21 +116,13 @@ class _AileUyeEkraniState extends State<AileUyeEkrani> {
             return ListView(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 30),
               children: [
-                Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      gradient: const LinearGradient(colors: [Renk.yesil, Renk.yesilKoyu]),
-                      border: Border.all(color: Renk.altin, width: 2.5),
-                    ),
-                    child: const Text('BEREKET',
-                        style: TextStyle(
-                            color: Renk.altin,
-                            fontSize: 24,
-                            letterSpacing: 2,
-                            fontWeight: FontWeight.w900)),
-                  ),
+                const Center(
+                  child: Text('BEREKET',
+                      style: TextStyle(
+                          color: Renk.kurumsal,
+                          fontSize: 26,
+                          letterSpacing: 6,
+                          fontWeight: FontWeight.w900)),
                 ),
                 const SizedBox(height: 12),
                 Panel(

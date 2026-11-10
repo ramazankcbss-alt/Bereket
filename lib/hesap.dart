@@ -324,8 +324,15 @@ class Veriler {
   /// Kişinin (ör. Babam) tarlalarının özeti; yil verilmezse tüm yıllar.
   SahipOzet sahipOzet(String sahip, {int? yil}) {
     final o = SahipOzet(sahip);
+    // Kim ekiyor her yılın ekiminde: o yıl (yıl yoksa en son ekildiği yıl)
+    // kişinin payı olan tarlalar.
     for (final t in tarlalar) {
-      final p = tarlaPaylari(t.id)[sahip] ?? 0;
+      var y = yil;
+      if (y == null) {
+        final yillar = [for (final e in ekimler) if (e.s('tarlaId') == t.id) e.t('yil')];
+        if (yillar.isNotEmpty) y = yillar.reduce((a, b) => a > b ? a : b);
+      }
+      final p = (y == null ? tarlaPaylari(t.id) : tarlaYilPaylari(t.id, y))[sahip] ?? 0;
       if (p > 0) {
         o.tarlaSayisi++;
         o.dekar += t.n('dekar') * p;
