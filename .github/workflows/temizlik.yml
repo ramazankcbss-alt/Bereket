@@ -1,0 +1,49 @@
+name: Eski projeyi temizle
+
+# egitim-takip-5a833 projesindeki Bereket (tarlam_*) verisini ve kurallarını
+# temizler. Yalnızca "temizlik" dalında, tasima/komut.txt değişince çalışır
+# (main'e dokunmaz, APK derlenmez). İş bitince bu dal silinir.
+on:
+  push:
+    branches: [temizlik]
+    paths:
+      - 'tasima/komut.txt'
+
+permissions:
+  contents: read
+
+jobs:
+  temizle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Mod
+        run: |
+          MOD=$(head -1 tasima/komut.txt | tr -d " \r\n")
+          case "$MOD" in kontrol|sil) ;; *) echo "::error::Geçersiz mod: $MOD"; exit 1;; esac
+          echo "MOD=$MOD" >> "$GITHUB_ENV"
+
+      - name: Anahtarları çöz
+        env:
+          TASIMA_SIFRESI: ${{ secrets.TASIMA_SIFRESI }}
+        run: |
+          [ -z "$TASIMA_SIFRESI" ] && { echo "::error::TASIMA_SIFRESI gizli ayarı eksik."; exit 1; }
+          mkdir -p "$RUNNER_TEMP/k"
+          openssl enc -d -aes-256-cbc -pbkdf2 -in tasima/anahtarlar.enc -pass env:TASIMA_SIFRESI \
+            | tar -x -C "$RUNNER_TEMP/k"
+
+      - name: Bağımlılıklar
+        working-directory: tasima
+        run: npm install --no-save --no-audit --no-fund firebase-admin@13
+
+      - name: Temizlik betiği
+        working-directory: tasima
+        env:
+          ESKI_ANAHTAR: ${{ runner.temp }}/k/eski.json
+          YENI_ANAHTAR: ${{ runner.temp }}/k/yeni.json
+        run: node temizle.js "$MOD"
+
+      - name: Anahtarları sil
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/k"
