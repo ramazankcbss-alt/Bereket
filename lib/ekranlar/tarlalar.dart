@@ -10,8 +10,6 @@ import 'form.dart';
 import 'kabuk.dart';
 import 'uretim.dart';
 
-const _gecmisYilSayisi = 5;
-
 /// Ortak ekim alanları: "Ortak ekiliyor" + her kişi için pay (%).
 List<Alan> ortakAlanlari(List<String> sahipler,
         {bool Function(Map<String, dynamic> d)? gorunur}) =>
@@ -45,7 +43,6 @@ void ortakTopla(Map<String, dynamic> d) {
 Future<void> tarlaFormu(BuildContext context, Durum durum, {Kayit? tarla}) {
   final v = durum.v;
   final sahipler = v.sahipler();
-  final buYil = DateTime.now().year;
   final bas = <String, dynamic>{
     'cks': 'Babam',
     'mulkiyet': 'Kendi',
@@ -54,15 +51,11 @@ Future<void> tarlaFormu(BuildContext context, Durum durum, {Kayit? tarla}) {
     'ilce': 'Karapınar',
     ...?tarla?.d,
   };
-  if (tarla != null) {
-    tarla.m('gecmis').forEach((y, u) => bas['g$y'] = u.toString());
-    ortakDoldur(bas, tarla.m('ortaklar'));
-  }
+  if (tarla != null) ortakDoldur(bas, tarla.m('ortaklar'));
   bool kiralik(Map<String, dynamic> d) =>
       (d['mulkiyet'] ?? '').toString() != 'Kendi' &&
       (d['mulkiyet'] ?? '').toString() != 'Ortak';
   bool baskasiEkiyor(Map<String, dynamic> d) => d['sahip'] == baskasi;
-  final urunAdlari = ['Boş / nadas', for (final u in urunler) u.ad];
   final kiraVerenler = <String>{
     'Milli Emlak',
     for (final t in v.tarlalar)
@@ -100,28 +93,11 @@ Future<void> tarlaFormu(BuildContext context, Durum durum, {Kayit? tarla}) {
           secenekler: ['', ...sahipler],
           gorunur: (d) => !kiralik(d),
           aciklama: 'Boşsa ÇKS sahibine yazılır. Ürün desteği her zaman ekene yazılır.'),
-      for (var i = 1; i <= _gecmisYilSayisi; i++)
-        Alan('g${buYil - i}', '${buYil - i} yılında ekilen',
-            tip: AlanTip.secim, secenekler: urunAdlari,
-            aciklama: i == 1 ? 'Münavebe için geçmiş yıllar (ÇKS\'den).' : null),
       const Alan('not', 'Not', tip: AlanTip.uzun),
     ],
+    // Ürünler burada girilmez: her yılın ürünü ekim kayıtlarından gelir.
+    // Eski sürümde girilmiş 'gecmis' bilgisi olduğu gibi korunur.
     onKaydet: (d) async {
-      final gecmis = <String, String>{};
-      if (tarla != null) {
-        tarla.m('gecmis').forEach((k, x) => gecmis[k] = x.toString());
-      }
-      for (var i = 1; i <= _gecmisYilSayisi; i++) {
-        final k = 'g${buYil - i}';
-        final u = (d.remove(k) ?? '').toString();
-        if (u.isEmpty || u == 'Boş / nadas') {
-          gecmis.remove('${buYil - i}');
-        } else {
-          gecmis['${buYil - i}'] = u;
-        }
-      }
-      d.removeWhere((k, _) => RegExp(r'^g\d{4}$').hasMatch(k));
-      d['gecmis'] = gecmis;
       ortakTopla(d);
       if (d['sahip'] != baskasi) {
         d['kiraci'] = null;
@@ -133,17 +109,20 @@ Future<void> tarlaFormu(BuildContext context, Durum durum, {Kayit? tarla}) {
   );
 }
 
-/// Ekim / hasat kaydı.
+/// Ekim / hasat kaydı. Gelecek yılın sezonu seçilirse durum "Ekim planlanıyor" olur
+/// (ÇKS'de gelecek yılın ürünü bu yılın başvuru döneminde yazılır).
 Future<void> ekimFormu(BuildContext context, Durum durum,
-    {Kayit? ekim, String? tarlaId, String? urun}) {
+    {Kayit? ekim, String? tarlaId, String? urun, int? yil}) {
   final v = durum.v;
   if (v.tarlalar.isEmpty) {
     bildir(context, 'Önce bir tarla ekleyin.');
     return Future.value();
   }
+  final buYil = DateTime.now().year;
+  final sezon = yil ?? buYil;
   final bas = <String, dynamic>{
-    'yil': DateTime.now().year,
-    'durum': 'Ekildi',
+    'yil': sezon,
+    'durum': sezon > buYil ? ekimPlanlaniyor : 'Ekildi',
     'tarlaId': tarlaId ?? '',
     if (urun != null) 'urun': urun,
     'sahip': '',
@@ -165,7 +144,8 @@ Future<void> ekimFormu(BuildContext context, Durum durum,
           aciklama: 'Boş bırakırsanız tarlada seçili kişi geçerli olur.'),
       ...ortakAlanlari(v.sahipler()),
       const Alan('durum', 'Durum', tip: AlanTip.secim, secenekler: ekimDurumlari),
-      const Alan('ekimTarihi', 'Ekim tarihi', tip: AlanTip.tarih),
+      Alan('ekimTarihi', 'Ekim tarihi', tip: AlanTip.tarih,
+          gorunur: (d) => d['durum'] != ekimPlanlaniyor),
       Alan('hasatKg', 'Hasat edilen miktar', tip: AlanTip.sayi, birim: 'kg',
           gorunur: (d) => d['durum'] == 'Hasat edildi',
           aciklama: 'Depoya bu miktar girer.'),
@@ -184,7 +164,17 @@ Future<void> ekimFormu(BuildContext context, Durum durum,
       final m = v.munavebe(t, u, y);
       return MunavebeSatiri(m);
     },
+    degisince: (key, d) {
+      if (key != 'yil') return;
+      final y = d['yil'] is num ? (d['yil'] as num).toInt() : buYil;
+      if (y > buYil) {
+        d['durum'] = ekimPlanlaniyor;
+      } else if (d['durum'] == ekimPlanlaniyor) {
+        d['durum'] = 'Ekildi';
+      }
+    },
     onKaydet: (d) async {
+      if (d['durum'] == ekimPlanlaniyor) d['ekimTarihi'] = null;
       if (d['durum'] != 'Hasat edildi') {
         d['hasatKg'] = null;
         d['hasatTarihi'] = null;
@@ -248,7 +238,7 @@ Future<void> neEkeyim(BuildContext context, Durum durum, Kayit tarla) {
             ],
           ),
           if (yillar.isEmpty)
-            const Text('Geçmiş yıl bilgisi yok. Tarlayı düzenleyip son yıllarda ne ekildiğini girerseniz öneriler daha doğru olur.',
+            const Text('Geçmiş yıl bilgisi yok. Son yıllarda ne ekildiğini "Ekim Gir" ile geçmiş sezonlara girerseniz öneriler daha doğru olur.',
                 style: yaziSoluk),
           const SizedBox(height: 12),
           for (final o in oneriler)
@@ -262,7 +252,7 @@ Future<void> neEkeyim(BuildContext context, Durum durum, Kayit tarla) {
                   ? null
                   : () {
                       Navigator.pop(c);
-                      ekimFormu(context, durum, tarlaId: tarla.id, urun: o.urun);
+                      ekimFormu(context, durum, tarlaId: tarla.id, urun: o.urun, yil: yil);
                     },
               child: Row(
                 children: [
@@ -357,8 +347,9 @@ class _TarlalarSayfasiState extends State<TarlalarSayfasi> {
         content: const Text(
           'ÇKS belgesini (e-Devlet ya da Ziraat Odası çıktısı) otomatik okuma, '
           'örnek bir belge gönderdiğinizde bir sonraki sürümde eklenecek.\n\n'
-          'Şimdilik parselleri "Tarla Ekle" ile girip, her tarlanın son yıllarda '
-          'ne ekildiğini düzenleme ekranından seçebilirsiniz. Münavebe ve '
+          'Şimdilik parselleri "Tarla Ekle" ile girin (ada, parsel, dekar). '
+          'Ürünleri "Ekim Gir" ile sezonuna göre yazın; gelecek yıl için ÇKS\'ye '
+          'yazdığınız ürün "Ekim planlanıyor" olarak kaydedilir. Münavebe ve '
           '"Ne ekeyim?" bu bilgiyle çalışır.',
         ),
         actions: [
@@ -409,7 +400,7 @@ class _TarlalarSayfasiState extends State<TarlalarSayfasi> {
         final yil = DateTime.now().year;
         final ekiliIds = {
           for (final e in v.ekimler)
-            if (e.t('yil') == yil) e.s('tarlaId')
+            if (e.t('yil') == yil && Veriler.ekili(e)) e.s('tarlaId')
         };
         double da(Iterable<Kayit> l) => l.fold(0.0, (a, t) => a + t.n('dekar'));
         final ekili = v.tarlalar.where((t) => ekiliIds.contains(t.id));
@@ -511,7 +502,10 @@ class _TarlalarSayfasiState extends State<TarlalarSayfasi> {
   Widget _tarlaKarti(BuildContext context, Veriler v, Kayit t, int yil) {
     final gecmis = v.urunGecmisi(t);
     final yillar = gecmis.keys.toList()..sort((a, b) => b.compareTo(a));
+    final buYilEkim = v.tarlaEkimleri(t.id).where((e) => e.t('yil') == yil).toList();
+    final buYilPlanli = buYilEkim.isNotEmpty && buYilEkim.every((e) => !Veriler.ekili(e));
     final buYilUrun = gecmis[yil];
+    final planlar = v.planliEkimler(t.id, yil + 1);
     final sahip = v.tarlaSahibi(t.id);
     final secili = _secili.contains(t.id);
     final m = buYilUrun == null ? null : v.munavebe(t, buYilUrun, yil);
@@ -572,8 +566,13 @@ class _TarlalarSayfasiState extends State<TarlalarSayfasi> {
                       Satir('Alan', '${sayi(t.n('dekar'))} dekar'),
                       Satir('Arazi', t.s('mulkiyet').isEmpty ? 'Kendi' : t.s('mulkiyet')),
                       if (kira > 0) Satir(kiraKalemi(t.s('mulkiyet')), tl0(kira)),
-                      Satir('$yil', buYilUrun ?? 'Ekilmedi',
+                      Satir('$yil',
+                          buYilUrun == null
+                              ? 'Ekilmedi'
+                              : (buYilPlanli ? '$buYilUrun (planlanıyor)' : buYilUrun),
                           renk: buYilUrun == null ? Renk.soluk : Renk.altin),
+                      for (final p in planlar)
+                        Satir('${p.t('yil')} planı', p.s('urun'), renk: Renk.turkuaz),
                     ],
                   ),
                 ),
@@ -596,13 +595,13 @@ class _TarlalarSayfasiState extends State<TarlalarSayfasi> {
                   Etiket('Kira geliri ${tl0(t.n('kiraGeliri'))}', renk: Renk.turkuaz),
               ],
             ),
-            if (yillar.isNotEmpty) ...[
+            if (yillar.any((y) => y < yil)) ...[
               const SizedBox(height: 8),
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
                 children: [
-                  for (final y in yillar.where((y) => y != yil).take(4))
+                  for (final y in yillar.where((y) => y < yil).take(4))
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(

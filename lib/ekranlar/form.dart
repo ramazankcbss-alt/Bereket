@@ -252,6 +252,8 @@ class _FormSayfasiState extends State<FormSayfasi> {
           if (sS.isNotEmpty && !a.secenekler.contains(sS)) sS,
         ];
         return DropdownButtonFormField<String>(
+          // Değer başka bir alana göre değişirse (degisince) kutu da yenilensin.
+          key: ValueKey('${a.key}:$sS'),
           initialValue: sS.isEmpty ? null : sS,
           isExpanded: true,
           dropdownColor: Renk.kartAcik,

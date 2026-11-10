@@ -158,7 +158,11 @@ const varlikSimge = <String, String>{
   'Diğer': '💼',
 };
 
-const ekimDurumlari = <String>['Ekildi', 'Büyüyor', 'Hasat edildi'];
+/// Gelecek sezon için ÇKS'ye yazılan ürün: henüz ekilmedi. ÇKS başvurusu
+/// 31 Aralık'ta biter; gelecek yılın ürünü bu yılın döneminde bildirilir.
+const ekimPlanlaniyor = 'Ekim planlanıyor';
+
+const ekimDurumlari = <String>[ekimPlanlaniyor, 'Ekildi', 'Büyüyor', 'Hasat edildi'];
 
 const mulkiyetler = <String>[
   'Kendi',

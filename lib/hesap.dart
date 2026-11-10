@@ -278,6 +278,15 @@ class Veriler {
 
   /// Tarlanın yıllara göre ürün geçmişi: ÇKS'den/elle girilen geçmiş +
   /// uygulamadaki ekimler (aynı yılda ekim varsa o geçerlidir).
+  /// Ekim gerçekten yapıldı mı (yalnızca planlanmış değil).
+  static bool ekili(Kayit e) => e.s('durum') != ekimPlanlaniyor;
+
+  /// Tarlanın [yil] ve sonrası için planlanmış ekimleri (yıla göre).
+  List<Kayit> planliEkimler(String tarlaId, int yil) => ekimler
+      .where((e) => e.s('tarlaId') == tarlaId && e.t('yil') >= yil && !ekili(e))
+      .toList()
+    ..sort((a, b) => a.t('yil').compareTo(b.t('yil')));
+
   Map<int, String> urunGecmisi(Kayit tarla) {
     final g = <int, String>{};
     tarla.m('gecmis').forEach((y, u) {
@@ -689,7 +698,7 @@ class Veriler {
       }
     }
     o.kiraGeliri = kiraGeliri(sahip);
-    o.ekiliDekar = ekimler.where((e) => e.t('yil') == yil).fold(
+    o.ekiliDekar = ekimler.where((e) => e.t('yil') == yil && ekili(e)).fold(
         0.0,
         (a, e) =>
             a + (tarla(e.s('tarlaId'))?.n('dekar') ?? 0) * (ekimPaylari(e)[sahip] ?? 0));
