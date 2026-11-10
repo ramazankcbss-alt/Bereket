@@ -53,6 +53,26 @@ class Veriler {
 
   Kayit? tarla(String id) => bul('tarlalar', id);
 
+  /// Seçim listeleri için: "Avşar · 1549/10 · 40 da · 2026 Mısır".
+  String tarlaEtiketi(String id) {
+    final t = tarla(id);
+    if (t == null) return 'Silinmiş tarla';
+    final p = [
+      tarlaAdi(id),
+      if (t.s('ada').isNotEmpty || t.s('parsel').isNotEmpty)
+        '${t.s('ada').isEmpty ? '-' : t.s('ada')}/${t.s('parsel').isEmpty ? '-' : t.s('parsel')}',
+      if (t.s('mahalle').isNotEmpty) t.s('mahalle'),
+      '${sayiYazi(t.n('dekar'))} da',
+    ];
+    final yil = DateTime.now().year;
+    final bu = ekimler.where((e) => e.s('tarlaId') == id && e.t('yil') == yil).map((e) => e.s('urun'));
+    if (bu.isNotEmpty) p.add('$yil ${bu.join('+')}');
+    return p.join(' · ');
+  }
+
+  static String sayiYazi(double n) =>
+      n == n.roundToDouble() ? n.toInt().toString() : n.toStringAsFixed(1).replaceAll('.', ',');
+
   String tarlaAdi(String id) {
     final t = tarla(id);
     if (t == null) return 'Silinmiş tarla';

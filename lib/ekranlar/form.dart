@@ -358,9 +358,7 @@ class _FormSayfasiState extends State<FormSayfasi> {
             for (final t in tT)
               DropdownMenuItem(
                 value: t.id,
-                child: Text(
-                    '${widget.v.tarlaAdi(t.id)} · ${sayi(t.n('dekar'))} da · ${widget.v.tarlaSahibi(t.id)}',
-                    overflow: TextOverflow.ellipsis),
+                child: Text(widget.v.tarlaEtiketi(t.id), overflow: TextOverflow.ellipsis),
               ),
           ],
           onChanged: (s) {
@@ -390,7 +388,7 @@ class _FormSayfasiState extends State<FormSayfasi> {
                 children: [
                   for (final t in tL)
                     FilterChip(
-                      label: Text('${widget.v.tarlaAdi(t.id)} (${sayi(t.n('dekar'))} da)'),
+                      label: Text(widget.v.tarlaEtiketi(t.id)),
                       selected: sL.contains(t.id),
                       onSelected: (s) {
                         if (s) {
