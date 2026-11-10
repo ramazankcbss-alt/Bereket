@@ -327,6 +327,13 @@ class _AileUyeEkraniState extends State<AileUyeEkrani> {
                     child: Text(hataYazisi(durum.hata!), style: const TextStyle(color: Renk.kirmizi)),
                   ),
                 Buton(
+                  yazi: 'Davet kodu gir (tarla ve üretim yetkisi)',
+                  ikon: Icons.vpn_key,
+                  renk: ButonRenk.yesil,
+                  onTap: () => kodGir(context, durum),
+                ),
+                const SizedBox(height: 10),
+                Buton(
                   yazi: 'Çıkış Yap',
                   renk: ButonRenk.gri,
                   onTap: () async {
@@ -340,5 +347,47 @@ class _AileUyeEkraniState extends State<AileUyeEkrani> {
         ),
       ),
     );
+  }
+}
+
+/// Kod gir: işletme sahibinin verdiği davet kodu (tarla ve üretimde işlem
+/// yetkisi) ya da aile kodu (yalnızca kendi özeti). Uygulama içinden,
+/// çıkış yapmadan yetkiyi değiştirmek için.
+Future<void> kodGir(BuildContext context, Durum durum) async {
+  final c = TextEditingController();
+  final kod = await showDialog<String>(
+    context: context,
+    builder: (d) => AlertDialog(
+      title: const Text('Kod gir'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+              'İşletme sahibinden aldığınız kodu yazın.\n'
+              '• Davet kodu: tarla ve üretimde kayıt ekleme ve düzenleme yetkisi.\n'
+              '• Aile kodu: yalnızca kendi özetiniz.',
+              style: yaziSoluk),
+          const SizedBox(height: 10),
+          TextField(
+            controller: c,
+            autofocus: true,
+            textCapitalization: TextCapitalization.characters,
+            decoration: const InputDecoration(labelText: 'Kod', hintText: 'Örn. K7PX3MQA'),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(d), child: const Text('Vazgeç')),
+        FilledButton(onPressed: () => Navigator.pop(d, c.text), child: const Text('Katıl')),
+      ],
+    ),
+  );
+  if (kod == null || kod.trim().length < 6) return;
+  try {
+    await Veri.kodlaKatil(durum.uid, durum.isim(durum.uid), kod);
+    if (context.mounted) bildir(context, 'Tamam. Yetkiniz güncellendi.');
+  } catch (e) {
+    if (context.mounted) bildir(context, hataYazisi(e));
   }
 }

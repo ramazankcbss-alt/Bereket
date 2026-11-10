@@ -10,6 +10,7 @@ import '../sabitler.dart';
 import '../servis/guncelleme.dart';
 import '../servis/veri.dart';
 import '../tema.dart';
+import 'aile_uye.dart';
 import 'form.dart';
 import 'kabuk.dart';
 
@@ -148,6 +149,16 @@ class ProfilSayfasi extends StatelessWidget {
                       style: yaziSoluk,
                     ),
                     const SizedBox(height: 12),
+                    if (!durum.yonetici) ...[
+                      Buton(
+                        yazi: 'Yeni kod gir',
+                        ikon: Icons.vpn_key,
+                        renk: ButonRenk.yesil,
+                        yukseklik: 46,
+                        onTap: () => kodGir(context, durum),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
                     Buton(
                       yazi: 'Çıkış Yap',
                       renk: ButonRenk.kirmizi,
@@ -287,11 +298,16 @@ class ProfilSayfasi extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
-            'Babanız, kardeşiniz Bereket\'i kurup aile koduyla katılır. Yalnızca kendi tarla '
-            'hesaplarını görür, sizinle alacak/verecek ekleyebilirler. Sizin diğer bilgilerinizi göremezler.',
+            'Aile kodu ile katılan yalnızca kendi özetini görür, işlem yapamaz. Tarla ve üretimde '
+            'işlem yapsın istiyorsanız yukarıdaki davet kodunu verin ya da buradaki 🚜 ile yetki verin.',
             style: yaziSoluk,
           ),
           const SizedBox(height: 6),
+          if (i.aile.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 6),
+              child: Text('Aile koduyla katılmış kimse yok.', style: yaziKalin),
+            ),
           for (final e in i.aile.entries)
             ListTile(
               contentPadding: EdgeInsets.zero,
@@ -458,7 +474,10 @@ class ProfilSayfasi extends StatelessWidget {
             ),
           if (durum.yonetici) ...[
             const Divider(height: 18),
-            const Text('Davet kodu: aile üyeleri ya da çalışanlar Bereket\'i kurup bu kodla katılır.',
+            const Text(
+                'Davet kodu: babanız, kardeşiniz ya da çalışanınız bu kodla katılır. Tarla ve '
+                'üretimde kayıt ekleyip düzenleyebilir; borç, alacak, varlık ve ev bütçenizi göremez. '
+                'Uygulamaya girmiş biri Profil → "Yeni kod gir" ile de katılabilir.',
                 style: yaziSoluk),
             const SizedBox(height: 8),
             Row(
