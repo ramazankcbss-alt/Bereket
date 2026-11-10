@@ -44,13 +44,14 @@ kotaları, ek gelirler, ev bütçesi ve yıllık kârlılık.
 
 ## Teknik
 
-- Flutter + Firebase (Auth + Firestore). Keleş Satış ve Eğitim Takip ile
-  **aynı Firebase projesi** (`egitim-takip-5a833`); veriler `tarlam_` ile
-  başlayan ayrı koleksiyonlardadır. Aynı hesapla girildiğinde Keleş Satış
-  satışları okunabilir (yalnızca okuma).
-- `firestore.rules` üç uygulamanın kurallarını birlikte içerir. Değiştirince
-  Firebase Console → Firestore → Kurallar'a dosyanın **tamamını** yapıştırıp
-  Yayınla deyin.
+- Flutter + Firebase (Auth + Firestore). Bereket kendi Firebase projesindedir
+  (`bereket-86ea7`); veriler `tarlam_` ile başlayan koleksiyonlardadır.
+- Keleş Satış satışları ayrı **keles-satis** projesinden okunur: Bereket ona
+  ikinci bir Firebase uygulaması olarak bağlanır ve Keleş Satış hesabıyla giriş
+  yapar (`lib/servis/keles.dart`). Bu veriler yalnızca okunur.
+- `firestore.rules` yalnızca Bereket'in kurallarını içerir. Değiştirince
+  Firebase Console (bereket-86ea7) → Firestore → Kurallar'a dosyanın
+  **tamamını** yapıştırıp Yayınla deyin.
 - `main` dalına her gönderimde GitHub Actions APK derler ve Releases'e koyar;
   kurulu uygulama yeni sürümü kendisi bulur.
 - İmza anahtarı `ci/bereket.p12`; şifresi depo ayarlarında

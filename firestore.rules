@@ -118,7 +118,8 @@ service cloud.firestore {
         allow write: if tarlamUye(iid);
       }
 
-      // Aile ile alacak/verecek kayıtları.
+      // Aile ile alacak/verecek kayıtları. Aile üyesi yalnızca hâlâ ailedeyken
+      // kendi eklediği kayıtları düzenleyip silebilir.
       match /aile_hareketler/{hid} {
         allow read: if tarlamUye(iid)
           || (signedIn() && tarlamAileAdi(iid) != '' && resource.data.kisi == tarlamAileAdi(iid));
@@ -129,11 +130,13 @@ service cloud.firestore {
           && request.resource.data.size() <= 20;
         allow update: if tarlamUye(iid)
           || (signedIn() && resource.data.ekleyen == uid()
+            && tarlamAileAdi(iid) != '' && resource.data.kisi == tarlamAileAdi(iid)
             && request.resource.data.kisi == resource.data.kisi
             && request.resource.data.ekleyen == uid()
             && request.resource.data.size() <= 20);
         allow delete: if tarlamUye(iid)
-          || (signedIn() && resource.data.ekleyen == uid());
+          || (signedIn() && resource.data.ekleyen == uid()
+            && tarlamAileAdi(iid) != '' && resource.data.kisi == tarlamAileAdi(iid));
       }
 
       // Tarlalar, ekimler, giderler, satışlar, hesaplar, gelirler...
