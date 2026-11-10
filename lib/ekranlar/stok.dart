@@ -59,8 +59,9 @@ Future<void> stokFormu(BuildContext context, Durum durum, {Kayit? stok}) {
           yeniYazi: '+ Yeni kişi',
           yeniEkle: (c) => yeniKisi(c, durum),
           aciklama: 'Herkes kullandığı kadarını üstlenir; aradaki fark Aile Hesapları\'nda borç/alacak olur.'),
-      const Alan('odendi', 'Ödendi', tip: AlanTip.anahtar,
-          ipucu: 'Kapatırsanız tutar satıcı adına Borçlarım\'a yazılır.'),
+      if (!durum.sinirli)
+        const Alan('odendi', 'Ödendi', tip: AlanTip.anahtar,
+            ipucu: 'Kapatırsanız tutar satıcı adına Borçlarım\'a yazılır.'),
       const Alan('not', 'Not', tip: AlanTip.uzun),
     ],
     degisince: (key, d) {
@@ -94,6 +95,7 @@ Future<void> stokFormu(BuildContext context, Durum durum, {Kayit? stok}) {
       );
     },
     onKaydet: (d) async {
+      if (durum.sinirli) d['odendi'] = true;
       final m = _n(d['miktar']);
       if (_n(d['birimFiyat']) <= 0 && m > 0) {
         d['birimFiyat'] = double.parse((_n(d['tutar']) / m).toStringAsFixed(4));

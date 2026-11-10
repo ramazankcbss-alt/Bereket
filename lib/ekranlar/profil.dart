@@ -297,15 +297,50 @@ class ProfilSayfasi extends StatelessWidget {
               contentPadding: EdgeInsets.zero,
               leading: const Text('👤', style: TextStyle(fontSize: 22)),
               title: Text('${e.value} · ${durum.isim(e.key)}', style: const TextStyle(color: Renk.yazi)),
-              trailing: IconButton(
-                icon: const Icon(Icons.person_remove_outlined, color: Renk.kirmizi),
-                onPressed: () async {
-                  try {
-                    await Veri.aileUyesiCikar(i.id, e.key);
-                  } catch (err) {
-                    if (context.mounted) bildir(context, hataYazisi(err));
-                  }
-                },
+              subtitle: const Text('Yalnızca kendi özetini görür', style: yaziSoluk),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: 'Tarla ve üretim yetkisi ver',
+                    icon: const Icon(Icons.agriculture, color: Renk.yesil),
+                    onPressed: () async {
+                      final evet = await showDialog<bool>(
+                        context: context,
+                        builder: (c) => AlertDialog(
+                          title: Text('${e.value} tarla ve üretimi yönetsin mi?'),
+                          content: const Text(
+                              'Sizin gibi tüm tarla, üretim, satış, depo ve stok ekranlarını görür; '
+                              'ekleme, düzenleme ve silme yapabilir. Borçlarınızı, alacaklarınızı, '
+                              'varlıklarınızı, ev bütçenizi ve maaşınızı göremez.'),
+                          actions: [
+                            TextButton(
+                                onPressed: () => Navigator.pop(c, false), child: const Text('Vazgeç')),
+                            FilledButton(
+                                onPressed: () => Navigator.pop(c, true), child: const Text('Yetki ver')),
+                          ],
+                        ),
+                      );
+                      if (evet != true) return;
+                      try {
+                        await Veri.aileyiUyeYap(i.id, e.key);
+                        if (context.mounted) bildir(context, '${e.value} artık tarla ve üretimde işlem yapabilir.');
+                      } catch (err) {
+                        if (context.mounted) bildir(context, hataYazisi(err));
+                      }
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.person_remove_outlined, color: Renk.kirmizi),
+                    onPressed: () async {
+                      try {
+                        await Veri.aileUyesiCikar(i.id, e.key);
+                      } catch (err) {
+                        if (context.mounted) bildir(context, hataYazisi(err));
+                      }
+                    },
+                  ),
+                ],
               ),
             ),
           const SizedBox(height: 6),
@@ -371,7 +406,13 @@ class ProfilSayfasi extends StatelessWidget {
               leading: const Text('👤', style: TextStyle(fontSize: 22)),
               title: Text(durum.isim(u), style: const TextStyle(color: Renk.yazi)),
               subtitle: Text(
-                  u == i.sahip ? 'Sahip' : (i.yoneticiler.contains(u) ? 'Yönetici' : 'Üye'),
+                  u == i.sahip
+                      ? 'Sahip'
+                      : (i.yoneticiler.contains(u)
+                          ? 'Yönetici'
+                          : (i.tamYetki.contains(u)
+                              ? 'Üye · kişisel hesapları da görür'
+                              : 'Üye · yalnızca tarla ve üretim')),
                   style: yaziSoluk),
               trailing: durum.yonetici && u != i.sahip && u != durum.uid
                   ? PopupMenuButton<String>(
@@ -381,7 +422,13 @@ class ProfilSayfasi extends StatelessWidget {
                             await Veri.isletmeGuncelle(i.id, {
                               'uyeler': i.uyeler.where((x) => x != u).toList(),
                               'yoneticiler': i.yoneticiler.where((x) => x != u).toList(),
+                              'tamYetki': i.tamYetki.where((x) => x != u).toList(),
                             });
+                          } else if (s == 'tam') {
+                            final t = i.tamYetki.contains(u)
+                                ? i.tamYetki.where((x) => x != u).toList()
+                                : [...i.tamYetki, u];
+                            await Veri.isletmeGuncelle(i.id, {'tamYetki': t});
                           } else {
                             final y = i.yoneticiler.contains(u)
                                 ? i.yoneticiler.where((x) => x != u).toList()
@@ -393,6 +440,12 @@ class ProfilSayfasi extends StatelessWidget {
                         }
                       },
                       itemBuilder: (_) => [
+                        if (!i.yoneticiler.contains(u))
+                          PopupMenuItem(
+                              value: 'tam',
+                              child: Text(i.tamYetki.contains(u)
+                                  ? 'Kişisel hesaplarımı gizle'
+                                  : 'Kişisel hesaplarımı da görsün')),
                         PopupMenuItem(
                             value: 'yonetici',
                             child: Text(i.yoneticiler.contains(u)

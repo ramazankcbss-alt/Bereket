@@ -16,6 +16,12 @@ service cloud.firestore {
     }
     function tarlamUye(iid) { return signedIn() && uid() in get(tarlamYol(iid)).data.uyeler; }
     function tarlamYonetici(iid) { return signedIn() && uid() in get(tarlamYol(iid)).data.yoneticiler; }
+    // Kişisel hesapları (borç/alacak, varlık, iş yeri-maaş) görebilen üye:
+    // yönetici ya da tam yetki verilen. Diğer üyeler yalnızca tarla ve üretimi görür.
+    function tarlamTam(iid) {
+      return signedIn() && (uid() in get(tarlamYol(iid)).data.yoneticiler
+        || uid() in get(tarlamYol(iid)).data.get('tamYetki', []));
+    }
     // Aile üyesi (Babam, Kardeşim): yalnızca kendi özetini ve hareketlerini görür.
     function tarlamAileAdi(iid) {
       return get(tarlamYol(iid)).data.get('aile', {}).get(uid(), '');
@@ -146,10 +152,11 @@ service cloud.firestore {
             'satislar', 'hesaplar', 'gelirler', 'isyerleri', 'varliklar',
             'fiyatlar', 'isler', 'kotalar', 'ekipmanlar', 'belgeler', 'stoklar'];
         }
-        allow read: if tarlamKoleksiyon() && tarlamUye(iid);
-        allow create, update: if tarlamKoleksiyon() && tarlamUye(iid)
-          && request.resource.data.size() <= 40;
-        allow delete: if tarlamKoleksiyon() && tarlamUye(iid);
+        function kisisel() { return koleksiyon in ['hesaplar', 'varliklar', 'isyerleri']; }
+        function erisim() { return tarlamKoleksiyon() && tarlamUye(iid) && (!kisisel() || tarlamTam(iid)); }
+        allow read: if erisim();
+        allow create, update: if erisim() && request.resource.data.size() <= 40;
+        allow delete: if erisim();
       }
     }
   }

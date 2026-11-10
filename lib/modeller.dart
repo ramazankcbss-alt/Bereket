@@ -66,7 +66,12 @@ class Isletme {
     required this.yoneticiler,
     required this.ayarlar,
     this.aile = const {},
+    this.tamYetki = const [],
   });
+
+  /// Kişisel hesapları (borç, alacak, varlık, ev bütçesi, maaş) da gören
+  /// üyeler. Yönetici olmayan diğer üyeler yalnızca tarla ve üretimi görür.
+  final List<String> tamYetki;
 
   /// Aile üyeleri: kullanıcı kimliği → hesap sahibi adı (Babam, Kardeşim).
   final Map<String, String> aile;
@@ -88,6 +93,7 @@ class Isletme {
       sahip: (d['sahip'] ?? '').toString(),
       uyeler: l('uyeler'),
       yoneticiler: l('yoneticiler'),
+      tamYetki: l('tamYetki'),
       ayarlar: a is Map ? {for (final e in a.entries) e.key.toString(): e.value} : {},
       aile: d['aile'] is Map
           ? {for (final e in (d['aile'] as Map).entries) e.key.toString(): e.value.toString()}

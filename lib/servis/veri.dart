@@ -34,6 +34,13 @@ class Veri {
     return kod;
   }
 
+  /// Aile üyesini tarla ve üretimde işlem yapabilen üyeye çevirir (yönetici).
+  /// Kişisel hesapları görmez; isterse Ekip'ten tam yetki verilir.
+  static Future<void> aileyiUyeYap(String iid, String uid) => isletmeler.doc(iid).update({
+        'uyeler': FieldValue.arrayUnion([uid]),
+        'aile.$uid': FieldValue.delete(),
+      });
+
   /// Aile üyesini işletmeden çıkarır (yönetici).
   static Future<void> aileUyesiCikar(String iid, String uid) =>
       isletmeler.doc(iid).update({'aile.$uid': FieldValue.delete()});
@@ -298,6 +305,13 @@ class Durum extends ChangeNotifier {
   Timer? _ozetZamanlayici;
   final Map<String, String> _yazilanOzet = {};
   bool get yonetici => isletme?.yoneticiler.contains(uid) ?? false;
+
+  /// Yalnızca tarla ve üretimi gören üye (kişisel hesaplar gizli).
+  bool get sinirli => uye && !yonetici && !(isletme?.tamYetki.contains(uid) ?? false);
+
+  /// Sınırlı üyenin okuyamadığı (kurallarla da kapalı) kişisel koleksiyonlar.
+  static const kisiselKoleksiyonlar = {'hesaplar', 'varliklar', 'isyerleri'};
+  bool? _abonelikSinirli;
   bool get yuklendi => _yuklenen.length == Veri.koleksiyonlar.length;
 
   Veriler _v = Veriler();
@@ -360,7 +374,14 @@ class Durum extends ChangeNotifier {
       isletmeYok = !s.exists;
       isletme = s.exists ? Isletme.fromMap(s.id, s.data()!) : null;
       hata = null;
-      if (uye && _aboneler.isEmpty) _koleksiyonlariDinle();
+      if (uye && (_aboneler.isEmpty || _abonelikSinirli != sinirli)) {
+        for (final a in _aboneler) {
+          a.cancel();
+        }
+        _aboneler.clear();
+        _abonelikSinirli = sinirli;
+        _koleksiyonlariDinle();
+      }
       if (aileUyesi && _aoAbone == null) _aileDinle();
       if (yonetici && _gAbone == null) {
         _gAbone = Veri.gizli(iid).snapshots().listen((g) {
@@ -386,6 +407,11 @@ class Durum extends ChangeNotifier {
 
   void _koleksiyonlariDinle() {
     for (final ad in Veri.koleksiyonlar) {
+      if (sinirli && kisiselKoleksiyonlar.contains(ad)) {
+        _k[ad] = const [];
+        _yuklenen.add(ad);
+        continue;
+      }
       _aboneler.add(Veri.kol(iid, ad).limit(5000).snapshots().listen((s) {
         _k[ad] = [for (final d in s.docs) Kayit(d.id, d.data())];
         _yuklenen.add(ad);
