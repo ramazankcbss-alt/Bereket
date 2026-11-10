@@ -7,6 +7,7 @@ import '../sabitler.dart';
 import '../servis/veri.dart';
 import '../tema.dart';
 import 'form.dart';
+import 'tarlalar.dart';
 import 'uretim.dart';
 
 /// Ortak stok (toplu alım): gübre, tohum, ilaç, mazot gibi topluca alınan
@@ -37,6 +38,7 @@ Future<void> stokFormu(BuildContext context, Durum durum, {Kayit? stok}) {
       'tarih': simdi.millisecondsSinceEpoch,
       'yil': simdi.year,
       'odendi': true,
+      'odeyen': Veriler.ben,
       ...?stok?.d,
     },
     alanlar: [
@@ -52,6 +54,11 @@ Future<void> stokFormu(BuildContext context, Durum durum, {Kayit? stok}) {
       const Alan('tarih', 'Alış tarihi', tip: AlanTip.tarih),
       const Alan('yil', 'Hangi sezon için', tip: AlanTip.yil),
       Alan('tedarikci', 'Nereden alındı', oneriler: tedarikciler),
+      Alan('odeyen', 'Kim ödedi / ödeyecek', tip: AlanTip.secim,
+          secenekler: v.sahipler(),
+          yeniYazi: '+ Yeni kişi',
+          yeniEkle: (c) => yeniKisi(c, durum),
+          aciklama: 'Herkes kullandığı kadarını üstlenir; aradaki fark Aile Hesapları\'nda borç/alacak olur.'),
       const Alan('odendi', 'Ödendi', tip: AlanTip.anahtar,
           ipucu: 'Kapatırsanız tutar satıcı adına Borçlarım\'a yazılır.'),
       const Alan('not', 'Not', tip: AlanTip.uzun),
@@ -99,7 +106,8 @@ Future<void> stokFormu(BuildContext context, Durum durum, {Kayit? stok}) {
             tutar: _n(d['tutar']),
             aciklama: 'Toplu alım: ${(d['aciklama'] ?? '').toString()}',
             tarih: _n(d['tarih']).toInt(),
-            uid: durum.uid);
+            uid: durum.uid,
+            kimin: (d['odeyen'] ?? '').toString());
       }
     },
     onSil: stok == null ? null : () => durum.sil('stoklar', stok.id),

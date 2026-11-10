@@ -97,6 +97,7 @@ Future<void> giderFormu(BuildContext context, Durum durum,
     'kalem': iscilik ? 'Makine İşçiliği' : 'Gübre',
     'birim': iscilik ? 'dekar' : 'kg',
     'odendi': true,
+    'odeyen': Veriler.ben,
     'tarlaIds': tarlaId == null ? <String>[] : [tarlaId],
     ...?gider?.d,
     ...?hazir,
@@ -194,6 +195,12 @@ Future<void> giderFormu(BuildContext context, Durum durum,
           gorunur: ortakSayac),
       Alan('tedarikci', 'Nereden alındı / kime ödendi',
           oneriler: yapanlar, gorunur: (d) => !makine(d) && !yevmiye(d) && !stoktan(d)),
+      Alan('odeyen', 'Kim ödedi / ödeyecek', tip: AlanTip.secim,
+          secenekler: v.sahipler(),
+          yeniYazi: '+ Yeni kişi',
+          yeniEkle: (c) => yeniKisi(c, durum),
+          gorunur: (d) => !stoktan(d) && !ortakSayac(d),
+          aciklama: 'Kullanan ayrı olabilir; kim kime borçlu Aile Hesapları\'nda çıkar.'),
       Alan('odendi', 'Ödendi', tip: AlanTip.anahtar,
           gorunur: (d) => !stoktan(d),
           ipucu: 'Kapatırsanız tutar, işi yapan / satıcı adına Borçlarım\'a yazılır.'),
@@ -295,6 +302,7 @@ Future<void> giderFormu(BuildContext context, Durum durum,
         if (_n(d['miktar']) <= 0) throw 'Kullanılan miktarı girin.';
         d['stokId'] = stok.id;
         d['odendi'] = true; // ödeme toplu alımda takip edilir
+        d['odeyen'] = null;
         d['tedarikci'] = stok.s('tedarikci').isEmpty ? 'Ortak stok' : stok.s('tedarikci');
       } else {
         d['stokId'] = null;
@@ -345,7 +353,8 @@ Future<void> giderFormu(BuildContext context, Durum durum,
             tutar: _n(d['tutar']),
             aciklama: '$is_ ${(d['aciklama'] ?? '').toString()}'.trim(),
             tarih: _n(d['tarih']).toInt(),
-            uid: durum.uid);
+            uid: durum.uid,
+            kimin: (d['odeyen'] ?? '').toString());
       }
     },
     onSil: gider == null ? null : () => durum.sil('giderler', gider.id),

@@ -126,6 +126,20 @@ class Veriler {
     for (final k in kotalar) {
       if (k.s('kullanan').isNotEmpty) s.add(k.s('kullanan'));
     }
+    // Ödeyen, kime yattı ve para hareketlerindeki kişiler.
+    for (final x in [...giderler, ...stoklar]) {
+      if (x.s('odeyen').isNotEmpty) s.add(x.s('odeyen'));
+    }
+    for (final x in aileHareketleri) {
+      if (x.s('veren').isNotEmpty) s.add(x.s('veren'));
+      if (x.s('alan').isNotEmpty) s.add(x.s('alan'));
+    }
+    for (final x in satislar) {
+      for (final o in x.liste('tahsilatlar')) {
+        final a = (o['alan'] ?? '').toString();
+        if (a.isNotEmpty) s.add(a);
+      }
+    }
     s.remove(baskasi);
     s.remove('');
     return s.toList();
@@ -300,7 +314,154 @@ class Veriler {
       o.tahsil += tahsilToplam(s) * p;
       o.satisKg += s.n('kg') * p;
     }
+    o.defter = kisiHesaplari(yil: yil)[sahip];
     return o;
+  }
+
+  // ---------------------------------------------------------------------
+  // Kişi hesapları (kim kime borçlu)
+  // ---------------------------------------------------------------------
+
+  final Map<int?, Map<String, KisiHesap>> _defterler = {};
+
+  static String _kisi(String s) => s.trim().isEmpty ? ben : s.trim();
+
+  /// Her kişinin ayrı hesabı. Herkes kullandığı malzeme ve masraf payını
+  /// (o yıl ektiği tarlalara göre) üstlenir; kim ödediyse onun hesabına
+  /// ödeme yazılır. Satış ve destek parası kime yattıysa onun eline geçmiş
+  /// sayılır. Aradaki fark kişiler arası borç/alacaktır. Kim ödedi / kime
+  /// yattı girilmemiş eski kayıtlar "Ben" sayılır.
+  Map<String, KisiHesap> kisiHesaplari({int? yil}) =>
+      _defterler.putIfAbsent(yil, () => _defterKur(yil));
+
+  Map<String, KisiHesap> _defterKur(int? yil) {
+    final h = <String, KisiHesap>{};
+    KisiHesap k(String ad) => h.putIfAbsent(_kisi(ad), () => KisiHesap(_kisi(ad)));
+    bool yilda(int y) => yil == null || y == yil;
+    for (final ad in sahipler()) {
+      k(ad);
+    }
+    final kisiler = h.keys.toList();
+
+    // Giderler (ev giderleri hariç). Stoktan kullanımın ödemesi toplu alımda.
+    for (final g in giderler) {
+      if (g.s('alan') == 'ev' || !yilda(g.yil)) continue;
+      final t = g.n('tutar');
+      if (t == 0) continue;
+      if (g.s('stokId').isEmpty) k(g.s('odeyen')).odedi += t;
+      var top = 0.0;
+      for (final ad in kisiler) {
+        final p = giderSahipPayi(g, ad);
+        if (p > 0) k(ad).yuk += t * p;
+        top += p;
+      }
+      // Kiraya verilen tarla gibi kimseye düşmeyen pay "Ben"de kalır.
+      if (top < 0.999) k(ben).yuk += t * (1 - top);
+    }
+    // Gider girilmemiş kiralık tarla kirası ve kiralanan pancar kotası (Ben öder).
+    for (final e in ekimler) {
+      if (!yilda(e.t('yil'))) continue;
+      final t = tarla(e.s('tarlaId'));
+      if (t == null || t.n('kira') <= 0) continue;
+      final kiraVar = giderler.any((g) =>
+          g.yil == e.t('yil') &&
+          (g.s('kalem') == 'Arazi Kirası' || g.s('kalem') == 'Ecrimisil') &&
+          g.l('tarlaIds').contains(t.id));
+      if (kiraVar) continue;
+      final tutar = t.n('kira') * ekimOrani(e);
+      k(ben).odedi += tutar;
+      ekimPaylari(e).forEach((ad, p) => k(ad).yuk += tutar * p);
+    }
+    for (final q in kotalar) {
+      if (!yilda(q.t('yil')) || q.n('kiraBedeli') <= 0) continue;
+      k(ben).odedi += q.n('kiraBedeli');
+      k(kotaKullanan(q)).yuk += q.n('kiraBedeli');
+    }
+    // Toplu alımlar: ödeyen öder; kalan stok ödeyenin elinde sayılır.
+    for (final st in stoklar) {
+      if (!yilda(st.t('yil'))) continue;
+      final o = k(st.s('odeyen'));
+      o.odedi += st.n('tutar');
+      o.yuk += stokKalan(st.id) * st.n('birimFiyat');
+    }
+    // Satışlar: payına düşen tahsilat hakkı; para kime yattıysa onda.
+    for (final sa in satislar) {
+      if (!yilda(sa.yil)) continue;
+      final top = tahsilToplam(sa);
+      if (top == 0) continue;
+      satisPaylari(sa).forEach((ad, p) => k(ad).hak += top * p);
+      k(ben).aldi += sa.n('tahsil');
+      for (final o in sa.liste('tahsilatlar')) {
+        final v = o['tutar'];
+        if (v is num) k((o['alan'] ?? '').toString()).aldi += v.toDouble();
+      }
+    }
+    // Destekler.
+    for (final g in destekler) {
+      if (!yilda(g.yil)) continue;
+      destekSahipPaylari(g).forEach((ad, t) => k(ad).hak += t);
+      k(g.s('yatan')).aldi += g.n('tutar');
+    }
+    // Kişiler arası para hareketleri.
+    for (final x in aileHareketleri) {
+      if (!yilda(x.yil)) continue;
+      final t = x.n('tutar');
+      String veren, alan;
+      if (x.s('veren').isNotEmpty && x.s('alan').isNotEmpty) {
+        veren = x.s('veren');
+        alan = x.s('alan');
+      } else if (x.s('yon') == 'o_verdi') {
+        veren = x.s('kisi');
+        alan = ben;
+      } else {
+        veren = ben;
+        alan = x.s('kisi');
+      }
+      k(veren).verdi += t;
+      k(alan).aldiPara += t;
+    }
+    // Borçlarım: birinin borcunu başkası ödediyse ödeyen ona para vermiş sayılır.
+    for (final b in hesaplar) {
+      if (b.s('yon') == 'alacak' || b.s('birim') == 'gram') continue;
+      for (final x in b.liste('hareketler')) {
+        if (x['tip'] != 'odeme') continue;
+        final odeyen = _kisi((x['odeyen'] ?? '').toString());
+        final kimin = _kisi((x['kimin'] ?? '').toString());
+        if (odeyen == kimin) continue;
+        final ms = x['t'] is num ? (x['t'] as num).toInt() : 0;
+        if (yil != null && ms > 0 && DateTime.fromMillisecondsSinceEpoch(ms).year != yil) continue;
+        final v = x['tutar'];
+        final t = v is num ? v.toDouble() : 0.0;
+        k(odeyen).verdi += t;
+        k(kimin).aldiPara += t;
+      }
+    }
+    return h;
+  }
+
+  /// Hesapları kapatmak için en az sayıda ödeme: kim kime ne kadar.
+  List<Odeme> hesaplasmaOnerisi({int? yil}) {
+    final alacakli = <MapEntry<String, double>>[];
+    final borclu = <MapEntry<String, double>>[];
+    for (final x in kisiHesaplari(yil: yil).values) {
+      if (x.bakiye > 0.5) alacakli.add(MapEntry(x.kisi, x.bakiye));
+      if (x.bakiye < -0.5) borclu.add(MapEntry(x.kisi, -x.bakiye));
+    }
+    alacakli.sort((a, b) => b.value.compareTo(a.value));
+    borclu.sort((a, b) => b.value.compareTo(a.value));
+    final out = <Odeme>[];
+    var i = 0, j = 0;
+    final a = [for (final e in alacakli) e.value];
+    final b = [for (final e in borclu) e.value];
+    while (i < a.length && j < b.length) {
+      final t = a[i] < b[j] ? a[i] : b[j];
+      if (t > 0.5) out.add(Odeme(borclu[j].key, alacakli[i].key, t));
+      a[i] -= t;
+      b[j] -= t;
+      if (a[i] <= 0.5) i++;
+      if (b[j] <= 0.5) j++;
+    }
+    return out;
   }
 
   /// Tarladaki ekimler (yeniden eskiye).
@@ -1197,6 +1358,42 @@ class GirdiFiyat {
   }
 }
 
+/// Bir kişinin ayrı hesabı.
+class KisiHesap {
+  KisiHesap(this.kisi);
+  final String kisi;
+
+  /// Giderlerde ve toplu alımlarda ödediği (ya da üstüne borçlandığı).
+  double odedi = 0;
+
+  /// Kullandığı malzeme ve masraf payı (+ elinde kalan stok).
+  double yuk = 0;
+
+  /// Satış ve destek parasından payına düşen.
+  double hak = 0;
+
+  /// Satış ve destek parasından eline (hesabına) geçen.
+  double aldi = 0;
+
+  /// Başkalarına verdiği / onların borcuna ödediği para.
+  double verdi = 0;
+
+  /// Başkalarından aldığı para.
+  double aldiPara = 0;
+
+  /// + ise başkalarından alacaklı, − ise borçlu.
+  double get bakiye => odedi - yuk + hak - aldi + verdi - aldiPara;
+
+  bool get bos =>
+      odedi.abs() + yuk.abs() + hak.abs() + aldi.abs() + verdi.abs() + aldiPara.abs() < 1;
+}
+
+class Odeme {
+  const Odeme(this.kimden, this.kime, this.tutar);
+  final String kimden, kime;
+  final double tutar;
+}
+
 class SahipOzet {
   SahipOzet(this.sahip);
   final String sahip;
@@ -1219,11 +1416,12 @@ class SahipOzet {
   double get masraf => kalemler.values.fold(0.0, (a, k) => a + k.tutar);
   double get kar => satis + kiraGeliri + destek - masraf;
 
-  /// Hesaplaşma: + ise bende kişiye ait para var (ona ödenecek);
-  /// − ise kişi bana borçlu. Satıştan tahsil edilen − yaptığım masraf ±
-  /// yanlış hesaba yatan destekler.
+  /// Kişinin ayrı hesabı (kim ödedi, kime yattı, para hareketleri).
+  KisiHesap? defter;
+
+  /// Hesaplaşma: + ise kişinin başkalarından alacağı var; − ise borçlu.
   double get hesaplasma =>
-      tahsil - masraf + destekDuzeltme + onunVerdigi - benimVerdigim;
+      defter?.bakiye ?? (tahsil - masraf + destekDuzeltme + onunVerdigi - benimVerdigim);
 
   /// Aile üyesinin ekranı için özet (Firestore'a yazılır).
   Map<String, dynamic> harita(Veriler v) => {

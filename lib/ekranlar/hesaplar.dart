@@ -76,6 +76,14 @@ Future<void> hareketFormu(BuildContext context, Durum durum, Kayit hesap, String
   final baslik = tip == 'odeme'
       ? (borc ? 'Ödeme Yap' : 'Tahsilat')
       : (borc ? 'Borç Ekle' : 'Alacak Ekle');
+  final v = durum.v;
+  // Kişiler arası: kimin borcunu kim ödedi (TL borçlarda).
+  final kisili = borc && hesap.s('birim') != 'gram';
+  var sonKimin = Veriler.ben;
+  for (final x in hesap.liste('hareketler')) {
+    final k = (x['kimin'] ?? '').toString();
+    if (x['tip'] == 'artis' && k.isNotEmpty) sonKimin = k;
+  }
   return formAc(
     context,
     baslik: baslik,
@@ -83,8 +91,16 @@ Future<void> hareketFormu(BuildContext context, Durum durum, Kayit hesap, String
     baslangic: {
       't': DateTime.now().millisecondsSinceEpoch,
       if (tip == 'odeme' && hesap.n('taksitTutari') > 0) 'tutar': hesap.n('taksitTutari'),
+      if (kisili) 'kimin': sonKimin,
+      if (kisili) 'odeyen': sonKimin,
     },
     alanlar: [
+      if (kisili)
+        Alan('kimin', 'Kimin borcu', tip: AlanTip.secim, secenekler: v.sahipler()),
+      if (kisili && tip == 'odeme')
+        Alan('odeyen', 'Kim ödedi', tip: AlanTip.secim,
+            secenekler: v.sahipler(),
+            aciklama: 'Başkası ödediyse borç sahibine para vermiş sayılır (Aile Hesapları).'),
       Alan('tutar', 'Tutar', tip: AlanTip.sayi,
           birim: hesap.s('birim') == 'gram' ? 'gram' : '₺', zorunlu: true),
       const Alan('t', 'Tarih', tip: AlanTip.tarih),
@@ -93,11 +109,18 @@ Future<void> hareketFormu(BuildContext context, Durum durum, Kayit hesap, String
               ? const ['Taksit', 'Nakit', 'Havale', 'Pancar bedelinden mahsup']
               : const ['Gübre', 'Tohum', 'İlaç', 'Mazot', 'Nakit avans', 'Faiz']),
     ],
+    degisince: (key, d) {
+      if (key == 'kimin') d['odeyen'] = d['kimin'];
+    },
     onKaydet: (d) => Veri.hareketEkle(durum.iid, hesap.id,
         tip: tip,
         tutar: _n(d['tutar']),
         aciklama: (d['ac'] ?? '').toString(),
-        tarih: _n(d['t']).toInt()),
+        tarih: _n(d['t']).toInt(),
+        ek: {
+          if (kisili) 'kimin': (d['kimin'] ?? Veriler.ben).toString(),
+          if (kisili && tip == 'odeme') 'odeyen': (d['odeyen'] ?? Veriler.ben).toString(),
+        }),
   );
 }
 

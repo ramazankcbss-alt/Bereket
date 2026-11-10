@@ -200,7 +200,8 @@ class Veri {
       required double tutar,
       String aciklama = '',
       int? tarih,
-      String? anahtar}) {
+      String? anahtar,
+      Map<String, dynamic> ek = const {}}) {
     return kol(iid, 'hesaplar').doc(hesapId).update({
       'hareketler': FieldValue.arrayUnion([
         {
@@ -209,6 +210,7 @@ class Veri {
           'ac': aciklama,
           't': tarih ?? simdi,
           'k': anahtar ?? yeniKod(), // aynı tutarlı iki hareket birleşmesin
+          ...ek,
         }
       ]),
     });
@@ -235,7 +237,8 @@ class Veri {
       required String aciklama,
       required int tarih,
       String? uid,
-      String yon = 'borc'}) async {
+      String yon = 'borc',
+      String? kimin}) async {
     final ad = kime.trim();
     if (ad.isEmpty || tutar <= 0) return;
     final alacak = yon == 'alacak';
@@ -254,7 +257,8 @@ class Veri {
           'hareketler': <Map<String, dynamic>>[],
         }, uid: uid);
     await hareketEkle(iid, id,
-        tip: 'artis', tutar: tutar, aciklama: aciklama, tarih: tarih);
+        tip: 'artis', tutar: tutar, aciklama: aciklama, tarih: tarih,
+        ek: {if (kimin != null && kimin.isNotEmpty) 'kimin': kimin});
   }
 }
 

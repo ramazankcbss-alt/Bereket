@@ -181,14 +181,18 @@ Future<void> tahsilatEkle(BuildContext context, Durum durum, Kayit satis) {
       'tur': satis.b('sozlesmeli') ? 'Avans' : 'Ürün bedeli',
       'banka': satis.s('yer') == 'Şeker Fabrikası' ? 'Vakıfbank' : 'Nakit',
       'tarih': DateTime.now().millisecondsSinceEpoch,
+      'alan': Veriler.ben,
       if (kalan > 0) 'tutar': double.parse(kalan.toStringAsFixed(2)),
     },
-    alanlar: const [
-      Alan('tur', 'Ödeme türü', tip: AlanTip.secim, secenekler: tahsilatTurleri),
-      Alan('tutar', 'Tutar', tip: AlanTip.sayi, birim: '₺', zorunlu: true),
-      Alan('banka', 'Nereye yattı', tip: AlanTip.secim, secenekler: bankalar),
-      Alan('tarih', 'Tarih', tip: AlanTip.tarih),
-      Alan('ac', 'Not'),
+    alanlar: [
+      const Alan('tur', 'Ödeme türü', tip: AlanTip.secim, secenekler: tahsilatTurleri),
+      const Alan('tutar', 'Tutar', tip: AlanTip.sayi, birim: '₺', zorunlu: true),
+      Alan('alan', 'Para kime yattı / kim aldı', tip: AlanTip.secim,
+          secenekler: v.sahipler(),
+          aciklama: 'Satış kimin olursa olsun, parayı alan kişinin hesabına geçer.'),
+      const Alan('banka', 'Nereye yattı', tip: AlanTip.secim, secenekler: bankalar),
+      const Alan('tarih', 'Tarih', tip: AlanTip.tarih),
+      const Alan('ac', 'Not'),
     ],
     onKaydet: (d) async {
       final l = [...satis.liste('tahsilatlar'), d];
