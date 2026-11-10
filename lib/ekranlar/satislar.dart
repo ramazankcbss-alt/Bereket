@@ -238,39 +238,23 @@ class _SatislarSayfasiState extends State<SatislarSayfasi> {
         final sirali = gruplar.entries.toList()
           ..sort((a, b) => toplam(b.value).compareTo(toplam(a.value)));
         return [
+          SecimSatiri(
+            secenekler: [for (final y in yillar) '$y'],
+            etiket: 'Yıl',
+            secili: '$_yil',
+            onSec: (s) => setState(() => _yil = int.parse(s)),
+          ),
+          const SizedBox(height: 8),
           Panel(
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text('💰', style: TextStyle(fontSize: 48)),
-                const SizedBox(height: 8),
+                Text('$_yil satışları', style: yaziKalin),
+                Text('${l.length} satış · ${sayi(kg / 1000)} ton', style: yaziSoluk),
+                const SizedBox(height: 10),
                 Row(
                   children: [
-                    Expanded(
-                        child: Buton(
-                            yazi: 'Satış Ekle',
-                            renk: ButonRenk.yesil,
-                            onTap: () => satisFormu(context, durum))),
-                    const SizedBox(width: 10),
-                    Expanded(
-                        child: Buton(
-                            yazi: 'Keleş Satış\'tan Al',
-                            onTap: () => git(context, KelesAktar(durum: durum)))),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(child: BilgiKutu(baslik: '$_yil satış', deger: tl0(toplam(l)))),
-                    const SizedBox(width: 8),
-                    Expanded(child: BilgiKutu(baslik: 'Satılan', deger: '${sayi(kg / 1000)} ton')),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                        child: BilgiKutu(
-                            baslik: 'Tahsil edilen', deger: tl0(tahsil(l)), renk: Renk.yesil)),
+                    Expanded(child: BilgiKutu(baslik: 'Toplam', deger: tl0(toplam(l)))),
                     const SizedBox(width: 8),
                     Expanded(
                         child: BilgiKutu(
@@ -279,18 +263,19 @@ class _SatislarSayfasiState extends State<SatislarSayfasi> {
                             renk: Renk.kirmizi)),
                   ],
                 ),
+                const SizedBox(height: 4),
+                TextButton.icon(
+                  onPressed: () => git(context, KelesAktar(durum: durum)),
+                  icon: const Icon(Icons.download),
+                  label: const Text('Keleş Satış\'tan aktar'),
+                ),
               ],
             ),
           ),
-          SecimSatiri(
-            secenekler: [for (final y in yillar) '$y'],
-            secili: '$_yil',
-            onSec: (s) => setState(() => _yil = int.parse(s)),
-          ),
-          const SizedBox(height: 6),
-          SecimSatiri(
-            secenekler: kisiler,
-            secili: kisiler.contains(_kisi) ? _kisi : 'Hepsi',
+          const SizedBox(height: 4),
+          KisiSecici(
+            kisiler: kisiler,
+            secili: _kisi,
             onSec: (s) => setState(() => _kisi = s),
           ),
           const SizedBox(height: 10),

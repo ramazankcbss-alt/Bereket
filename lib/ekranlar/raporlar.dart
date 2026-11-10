@@ -53,12 +53,14 @@ class _RaporlarSayfasiState extends State<RaporlarSayfasi> {
         return [
           SecimSatiri(
             secenekler: [for (final y in yillar) '$y'],
+            etiket: 'Yıl',
             secili: '$_yil',
             onSec: (s) => setState(() => _yil = int.parse(s)),
           ),
           const SizedBox(height: 6),
           SecimSatiri(
             secenekler: kisiler,
+            etiket: 'Kişi',
             secili: kisi,
             onSec: (s) => setState(() => _kisi = s),
           ),

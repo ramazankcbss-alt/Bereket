@@ -139,6 +139,7 @@ class _DefterSayfasiState extends State<DefterSayfasi> {
             ),
           SecimSatiri(
             secenekler: turler,
+            etiket: 'Tür',
             secili: _tur,
             onSec: (s) => setState(() => _tur = s),
           ),

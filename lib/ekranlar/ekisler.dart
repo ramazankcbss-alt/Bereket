@@ -126,19 +126,11 @@ class EkIslerSayfasi extends StatelessWidget {
                         child: BilgiKutu(baslik: '$yil toplam', deger: tl0(yillik), renk: Renk.yesil)),
                   ],
                 ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                        child: Buton(
-                            yazi: 'Gelir Ekle',
-                            renk: ButonRenk.yesil,
-                            onTap: () => gelirFormu(context, durum))),
-                    const SizedBox(width: 10),
-                    Expanded(
-                        child: Buton(
-                            yazi: 'İş Yeri Ekle', onTap: () => isyeriFormu(context, durum))),
-                  ],
+                const SizedBox(height: 4),
+                TextButton.icon(
+                  onPressed: () => isyeriFormu(context, durum),
+                  icon: const Icon(Icons.add_business),
+                  label: const Text('İş yeri ekle'),
                 ),
               ],
             ),

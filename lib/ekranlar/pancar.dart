@@ -135,6 +135,7 @@ class _PancarSayfasiState extends State<PancarSayfasi> {
           ),
           SecimSatiri(
             secenekler: [for (final y in yillar) '$y'],
+            etiket: 'Yıl',
             secili: '$_yil',
             onSec: (s) => setState(() => _yil = int.parse(s)),
           ),

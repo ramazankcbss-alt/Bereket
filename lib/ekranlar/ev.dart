@@ -40,13 +40,33 @@ class _EvButcesiSayfasiState extends State<EvButcesiSayfasi> {
     return d.year == _ay.year && d.month == _ay.month;
   }
 
+  /// Harcama Ekle: nasıl girileceğini sorar.
+  Future<void> _ekleSec(BuildContext context) async {
+    const elle = '✍️  Elle gir';
+    const fis = '📷  Fiş okut';
+    const ekstre = '📄  Banka ekstresi yükle (Excel / CSV)';
+    const sms = '💬  Banka SMS\'lerinden al';
+    final s = await secimYap(context, 'Harcama nasıl girilsin?', [elle, fis, ekstre, sms]);
+    if (s == null || !context.mounted) return;
+    switch (s) {
+      case elle:
+        await giderFormu(context, durum, ev: true);
+      case fis:
+        git(context, BelgeOkut(durum: durum));
+      case ekstre:
+        git(context, EkstreYukle(durum: durum));
+      case sms:
+        git(context, BankaMesajlari(durum: durum));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Sayfa(
       baslik: 'Ev Bütçem',
       durum: durum,
       geri: widget.geri,
-      fab: ekleButonu('Harcama', () => giderFormu(context, durum, ev: true)),
+      fab: ekleButonu('Harcama Ekle', () => _ekleSec(context)),
       builder: (context, v) {
         final ev = v.giderler.where((g) => g.s('alan') == 'ev').toList();
         final ay = ev.where(_buAy).toList()
@@ -103,77 +123,20 @@ class _EvButcesiSayfasiState extends State<EvButcesiSayfasi> {
                   Text(
                       'Geçen ay ${tl0(gecenToplam)} · ${toplam >= gecenToplam ? '▲' : '▼'} %${((toplam - gecenToplam).abs() / gecenToplam * 100).toStringAsFixed(0)}',
                       style: yaziSoluk),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Buton(
-                        yazi: 'Ekstre Yükle',
-                        renk: ButonRenk.yesil,
-                        onTap: () => git(context, EkstreYukle(durum: durum)),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Buton(
-                        yazi: 'Harcama Ekle',
-                        onTap: () => giderFormu(context, durum, ev: true),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Buton(
-                        yazi: 'Banka SMS',
-                        ikon: Icons.sms,
-                        renk: ButonRenk.mor,
-                        onTap: () => git(context, BankaMesajlari(durum: durum)),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Buton(
-                        yazi: 'Fiş Okut',
-                        ikon: Icons.photo_camera,
-                        renk: ButonRenk.turuncu,
-                        onTap: () => git(context, BelgeOkut(durum: durum)),
-                      ),
-                    ),
-                  ],
-                ),
               ],
             ),
           ),
-          Row(
-            children: [
-              Expanded(
-                child: BuyukKart(
-                  simge: '🏡',
-                  baslik: 'Ev Hedefi',
-                  alt: v.evHedefi(DateTime.now()) == null
-                      ? 'Hedef belirle'
-                      : 'Bu ay ${tl0(v.evHedefi(DateTime.now())!.aylik)}',
-                  renk1: const Color(0xFFD9775A),
-                  renk2: const Color(0xFF8A3B25),
-                  onTap: () => git(context, EvHedefiSayfasi(durum: durum)),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: BuyukKart(
-                  simge: '📒',
-                  baslik: 'Gelir - Gider',
-                  alt: 'Tüm hareketler',
-                  renk1: const Color(0xFF4F6B8F),
-                  renk2: const Color(0xFF253A57),
-                  onTap: () => git(context, DefterSayfasi(durum: durum)),
-                ),
-              ),
-            ],
-          ),
+          ListeMenu(ogeler: [
+            MenuOge(
+                '🏡',
+                'Ev Alma Hedefi',
+                v.evHedefi(DateTime.now()) == null
+                    ? 'Hedef belirle'
+                    : 'Bu ay ${tl0(v.evHedefi(DateTime.now())!.aylik)}',
+                () => git(context, EvHedefiSayfasi(durum: durum))),
+            MenuOge('📒', 'Gelir - Gider', 'Tüm hareketler',
+                () => git(context, DefterSayfasi(durum: durum))),
+          ]),
           const SizedBox(height: 14),
           if (ay.any((g) => arabaKategorisi(g.s('kalem'))))
             Panel(

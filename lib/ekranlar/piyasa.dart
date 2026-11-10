@@ -116,6 +116,7 @@ class _PiyasaSayfasiState extends State<PiyasaSayfasi> {
         return [
           SecimSatiri(
             secenekler: takip,
+            etiket: 'Ürün',
             secili: _urun,
             onSec: (s) => setState(() {
               _urun = s;

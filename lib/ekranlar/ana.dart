@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../bicim.dart';
 import '../hesap.dart';
-import '../modeller.dart';
 import '../servis/veri.dart';
 import '../tema.dart';
 import 'aile.dart';
@@ -101,17 +100,8 @@ class AnaSayfa extends StatelessWidget {
                 const SizedBox(height: 10),
                 UstSayaclar(durum: durum, v: v),
                 const SizedBox(height: 12),
-                Buton(
-                  yazi: 'Fiş · Fatura · Dekont Çek',
-                  ikon: Icons.photo_camera,
-                  renk: ButonRenk.turuncu,
-                  yukseklik: 56,
-                  onTap: () => git(context, BelgeOkut(durum: durum)),
-                ),
-                const SizedBox(height: 14),
                 _profilKarti(context, v),
-                _isletmelerim(context, v),
-                _buyukKartlar(context, v),
+                ..._menuler(context, v),
                 if (durum.hata != null)
                   Panel(
                     kenarRengi: Renk.kirmizi,
@@ -175,326 +165,106 @@ class AnaSayfa extends StatelessWidget {
   Widget _profilKarti(BuildContext context, Veriler v) {
     final i = durum.isletme!;
     final yil = DateTime.now().year;
-    final buYil = v.ekimler.where((e) => e.t('yil') == yil).toList();
-    double dekar(Kayit e) => v.ekimDekar(e);
-    final ekili = buYil.fold(0.0, (a, e) => a + dekar(e));
+    final buYil = v.ekimler.where((e) => e.t('yil') == yil && Veriler.ekili(e)).toList();
+    final ekili = buYil.fold(0.0, (a, e) => a + v.ekimDekar(e));
     final hasat = buYil
         .where((e) => e.s('durum') == 'Hasat edildi')
-        .fold(0.0, (a, e) => a + dekar(e));
-    final acikIs = v.isler.where((x) => !x.b('tamam')).length;
+        .fold(0.0, (a, e) => a + v.ekimDekar(e));
     return Panel(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Column(
+          Row(
             children: [
-              Container(
-                width: 82,
-                height: 82,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const RadialGradient(colors: [Renk.kartAcik, Renk.zemin]),
-                  border: Border.all(color: Renk.altin, width: 3),
-                ),
-                alignment: Alignment.center,
-                child: const Text('👨‍🌾', style: TextStyle(fontSize: 44)),
-              ),
-              const SizedBox(height: 10),
-              GestureDetector(
-                onTap: () => git(context, IslerSayfasi(durum: durum)),
-                child: Stack(
-                  clipBehavior: Clip.none,
+              const Text('👨‍🌾', style: TextStyle(fontSize: 34)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 82,
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Renk.zeminAlt,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Renk.cizgi, width: 2),
-                      ),
-                      child: const Column(
-                        children: [
-                          Text('Görevler',
-                              style: TextStyle(
-                                  color: Renk.yazi,
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w700)),
-                          Text('📋', style: TextStyle(fontSize: 24)),
-                        ],
-                      ),
-                    ),
-                    if (acikIs > 0)
-                      Positioned(
-                        right: -4,
-                        top: -6,
-                        child: CircleAvatar(
-                          radius: 11,
-                          backgroundColor: Renk.kirmizi,
-                          child: Text('$acikIs',
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800)),
-                        ),
-                      ),
+                    Text(i.ad, maxLines: 1, overflow: TextOverflow.ellipsis, style: yaziKalin),
+                    Text(
+                        '${durum.isim(durum.uid)} · ${durum.yonetici ? 'Sahip' : 'Üye'} · '
+                        '${v.tarlalar.length} parsel, ${sayi(v.toplamDekar)} da',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: yaziSoluk),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Renk.zeminAlt,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Renk.cizgi),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(i.ad.toUpperCase(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              color: Renk.yazi,
-                              fontSize: 17,
-                              fontWeight: FontWeight.w900)),
-                      Text(
-                          'Toplam arazi: ${sayi(v.toplamDekar)} da · ${v.tarlalar.length} parsel',
-                          style: yaziSoluk),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(6),
-                        gradient: const LinearGradient(
-                            colors: [Renk.altin, Color(0xFFC99A2E)]),
-                      ),
-                      child: Text(durum.yonetici ? 'SAHİP' : 'ÜYE',
-                          style: const TextStyle(
-                              color: Color(0xFF3A2A00),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w900)),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(durum.isim(durum.uid),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              color: Renk.altin,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Cubuk(
-                  oran: ekili > 0 ? hasat / ekili : 0,
-                  yazi: '${sayi(hasat)}/${sayi(ekili)} da hasat',
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  ekili <= 0
-                      ? '$yil için henüz ekim girilmedi'
-                      : 'Hasat edilecek ${sayi(ekili - hasat)} dekar kaldı',
-                  textAlign: TextAlign.center,
-                  style: yaziSoluk,
-                ),
-              ],
-            ),
+          const SizedBox(height: 10),
+          Cubuk(
+            oran: ekili > 0 ? hasat / ekili : 0,
+            yazi: ekili <= 0
+                ? '$yil için henüz ekim girilmedi'
+                : '$yil hasat: ${sayi(hasat)} / ${sayi(ekili)} da',
           ),
         ],
       ),
     );
   }
 
-  Widget _isletmelerim(BuildContext context, Veriler v) {
+  List<Widget> _menuler(BuildContext context, Veriler v) {
     final yil = DateTime.now().year;
-    final depoTon = v.depo().fold(0.0, (a, d) => a + d.kalan) / 1000;
-    final bekleyen = v.satislar.where((s) => v.satisHesap(s).kalan(s.n('tahsil')) > 1).length;
-    final borcSayisi = v.hesaplar.where((h) => h.s('yon') != 'alacak' && v.bakiye(h) > 0).length;
-    final gecikme = v.gecikmisBorc(DateTime.now().millisecondsSinceEpoch) > 0;
-    final kareler = [
-      Kare(
-        simge: '🗺️',
-        baslik: 'Tarlalarım',
-        ust: '${v.tarlalar.length} Parsel',
-        renk: const Color(0xFF3F6B3A),
-        onTap: () => git(context, TarlalarSayfasi(durum: durum)),
-      ),
-      Kare(
-        simge: '🌱',
-        baslik: 'Üretim',
-        ust: '${v.ekimler.where((e) => e.t('yil') == yil).length} Ekim',
-        renk: const Color(0xFF6B5A2E),
-        onTap: () => git(context, UretimSayfasi(durum: durum)),
-      ),
-      Kare(
-        simge: '💰',
-        baslik: 'Satışlarım',
-        ust: '${v.satislar.where((s) => s.yil == yil).length} Satış',
-        renk: const Color(0xFF34508F),
-        rozet: bekleyen > 0,
-        onTap: () => git(context, SatislarSayfasi(durum: durum)),
-      ),
-      Kare(
-        simge: '🏭',
-        baslik: 'Depo',
-        ust: '${sayi(depoTon)} Ton',
-        renk: const Color(0xFF4A5468),
-        onTap: () => git(context, DepoSayfasi(durum: durum)),
-      ),
-      Kare(
-        simge: '📈',
-        baslik: 'Piyasa',
-        ust: 'Borsa · TMO',
-        renk: const Color(0xFF5B3FA8),
-        onTap: () => git(context, PiyasaSayfasi(durum: durum)),
-      ),
-      Kare(
-        simge: '📤',
-        baslik: 'Borçlarım',
-        ust: '$borcSayisi Hesap',
-        renk: const Color(0xFF7A3A3A),
-        rozet: gecikme,
-        onTap: () => git(context, HesaplarSayfasi(durum: durum, yon: 'borc')),
-      ),
-    ];
-    return Panel(
-      baslik: 'İşletmelerim',
-      child: GridView.count(
-        crossAxisCount: 3,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 0.95,
-        children: kareler,
-      ),
-    );
-  }
-
-  Widget _buyukKartlar(BuildContext context, Veriler v) {
     final simdi = DateTime.now();
-    final maasBekleyen = v.isyerleri
-        .where((i) => v.maasDurum(i, simdi) != MaasDurum.yatti)
-        .isNotEmpty;
-    Widget satir(Widget a, Widget b) => Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Row(children: [
-            Expanded(child: a),
-            const SizedBox(width: 12),
-            Expanded(child: b),
-          ]),
-        );
-    return Column(
-      children: [
-        satir(
-          BuyukKart(
-            simge: '💼',
-            baslik: 'Ek İşler',
-            alt: 'Maaş ve diğer gelirler',
-            renk1: const Color(0xFF3B6FD0),
-            renk2: const Color(0xFF203F86),
-            rozet: maasBekleyen ? 'Maaş' : null,
-            onTap: () => git(context, EkIslerSayfasi(durum: durum)),
-          ),
-          BuyukKart(
-            simge: '🟣',
-            baslik: 'Pancar & Koop.',
-            alt: 'Kota · fabrika · kooperatif',
-            renk1: const Color(0xFF8E5BE8),
-            renk2: const Color(0xFF4B2A9C),
-            onTap: () => git(context, PancarSayfasi(durum: durum)),
-          ),
-        ),
-        satir(
-          BuyukKart(
-            simge: '👨‍👩‍👦',
-            baslik: 'Aile Hesapları',
-            alt: 'Babam · Kardeşim',
-            renk1: const Color(0xFF2E8B57),
-            renk2: const Color(0xFF1C5A37),
-            onTap: () => git(context, AileSayfasi(durum: durum)),
-          ),
-          BuyukKart(
-            simge: '🔬',
-            baslik: 'Ar-Ge',
-            alt: 'Verimlilik · girdi fiyatı',
-            renk1: const Color(0xFF3A4A6B),
-            renk2: const Color(0xFF1E2A44),
-            onTap: () => git(context, ArgeSayfasi(durum: durum)),
-          ),
-        ),
-        satir(
-          BuyukKart(
-            simge: '🏦',
-            baslik: 'Finans',
-            alt: 'Kredi · varlık · sat/beklet',
-            renk1: const Color(0xFFC9932E),
-            renk2: const Color(0xFF7A5414),
-            onTap: () => git(context, FinansSayfasi(durum: durum, geri: true)),
-          ),
-          BuyukKart(
-            simge: '📥',
-            baslik: 'Alacaklarım',
-            alt: 'Tüccar · kişi · kira',
-            renk1: const Color(0xFF2BB3A8),
-            renk2: const Color(0xFF16695F),
-            onTap: () => git(context, HesaplarSayfasi(durum: durum, yon: 'alacak')),
-          ),
-        ),
-        satir(
-          BuyukKart(
-            simge: '📒',
-            baslik: 'Gelir - Gider',
-            alt: 'Bütün para hareketleri',
-            renk1: const Color(0xFF4F6B8F),
-            renk2: const Color(0xFF253A57),
-            onTap: () => git(context, DefterSayfasi(durum: durum)),
-          ),
-          BuyukKart(
-            simge: '🧰',
-            baslik: 'Malzemelerim',
-            alt: 'Traktör · sulama · araba',
-            renk1: const Color(0xFF7A6A4F),
-            renk2: const Color(0xFF433824),
-            onTap: () => git(context, EkipmanSayfasi(durum: durum)),
-          ),
-        ),
-        satir(
-          BuyukKart(
-            simge: '🏡',
-            baslik: 'Ev Alma Hedefi',
-            alt: v.evHedefi(DateTime.now()) == null
-                ? 'Hedef belirle'
-                : 'Bu ay ${tl0(v.evHedefi(DateTime.now())!.aylik)}',
-            renk1: const Color(0xFFD9775A),
-            renk2: const Color(0xFF8A3B25),
-            onTap: () => git(context, EvHedefiSayfasi(durum: durum)),
-          ),
-          BuyukKart(
-            simge: '🪙',
-            baslik: 'Varlıklarım',
-            alt: 'Birikim · net durum',
-            renk1: const Color(0xFFB8A040),
-            renk2: const Color(0xFF6B5A14),
-            onTap: () => git(context, VarliklarSayfasi(durum: durum)),
-          ),
-        ),
-      ],
-    );
+    final depoTon = v.depo().fold(0.0, (a, d) => a + d.kalan) / 1000;
+    final bekleyen = v.satislar.where((s) => v.satisHesap(s).kalan(tahsilToplam(s)) > 1).length;
+    final borcSayisi = v.hesaplar.where((h) => h.s('yon') != 'alacak' && v.bakiye(h) > 0).length;
+    final alacakSayisi = v.hesaplar.where((h) => h.s('yon') == 'alacak' && v.bakiye(h) > 0).length;
+    final gecikme = v.gecikmisBorc(simdi.millisecondsSinceEpoch) > 0;
+    final maasBekleyen = v.isyerleri.any((i) => v.maasDurum(i, simdi) != MaasDurum.yatti);
+    final acikIs = v.isler.where((x) => !x.b('tamam')).length;
+    final odemeler = v.hesaplasmaOnerisi();
+    final evHedef = v.evHedefi(simdi);
+    void ac(Widget w) => git(context, w);
+    return [
+      ListeMenu(baslik: 'Tarla ve Üretim', ogeler: [
+        MenuOge('🗺️', 'Tarlalarım', '${v.tarlalar.length} parsel · ${sayi(v.toplamDekar)} da',
+            () => ac(TarlalarSayfasi(durum: durum))),
+        MenuOge('🌱', 'Üretim Merkezi',
+            '$yil: ${v.ekimler.where((e) => e.t('yil') == yil).length} ekim · masraf · stok',
+            () => ac(UretimSayfasi(durum: durum))),
+        MenuOge('💰', 'Satışlarım', '$yil: ${v.satislar.where((s) => s.yil == yil).length} satış',
+            () => ac(SatislarSayfasi(durum: durum)),
+            rozet: bekleyen > 0 ? '$bekleyen ödeme bekliyor' : null),
+        MenuOge('🏭', 'Depo', '${sayi(depoTon)} ton ürün', () => ac(DepoSayfasi(durum: durum))),
+        MenuOge('🟣', 'Pancar & Kooperatif', 'Kota · fabrika · kooperatif',
+            () => ac(PancarSayfasi(durum: durum))),
+        MenuOge('📈', 'Piyasa', 'Borsa · TMO · fabrika fiyatları',
+            () => ac(PiyasaSayfasi(durum: durum))),
+      ]),
+      ListeMenu(baslik: 'Para', ogeler: [
+        MenuOge('👨‍👩‍👦', 'Aile Hesapları',
+            odemeler.isEmpty ? 'Herkesin hesabı denk' : '${odemeler.length} ödeme yapılacak',
+            () => ac(AileSayfasi(durum: durum))),
+        MenuOge('📤', 'Borçlarım', '$borcSayisi açık hesap',
+            () => ac(HesaplarSayfasi(durum: durum, yon: 'borc')),
+            rozet: gecikme ? 'Gecikmiş' : null),
+        MenuOge('📥', 'Alacaklarım', '$alacakSayisi açık hesap',
+            () => ac(HesaplarSayfasi(durum: durum, yon: 'alacak'))),
+        MenuOge('📒', 'Gelir - Gider', 'Bütün para hareketleri',
+            () => ac(DefterSayfasi(durum: durum))),
+        MenuOge('💼', 'Ek İşler', 'Maaş · diğer gelirler · destekler',
+            () => ac(EkIslerSayfasi(durum: durum)),
+            rozet: maasBekleyen ? 'Maaş' : null),
+        MenuOge('🏦', 'Finans', 'Kredi · yaklaşan ödemeler · sat/beklet',
+            () => ac(FinansSayfasi(durum: durum, geri: true))),
+      ]),
+      ListeMenu(baslik: 'Diğer', ogeler: [
+        MenuOge('📋', 'Görevler', acikIs == 0 ? 'Açık görev yok' : '$acikIs açık görev',
+            () => ac(IslerSayfasi(durum: durum))),
+        MenuOge('🪙', 'Varlıklarım', 'Birikim · ev bütçesi · net durum',
+            () => ac(VarliklarSayfasi(durum: durum))),
+        MenuOge('🏡', 'Ev Alma Hedefi',
+            evHedef == null ? 'Hedef belirle' : 'Bu ay ${tl0(evHedef.aylik)}',
+            () => ac(EvHedefiSayfasi(durum: durum))),
+        MenuOge('🧰', 'Malzemelerim', 'Traktör · sulama · araba',
+            () => ac(EkipmanSayfasi(durum: durum))),
+        MenuOge('🔬', 'Ar-Ge', 'Verimlilik · girdi fiyatları',
+            () => ac(ArgeSayfasi(durum: durum))),
+      ]),
+    ];
   }
 }

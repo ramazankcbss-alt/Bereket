@@ -84,7 +84,7 @@ class _EkipmanSayfasiState extends State<EkipmanSayfasi> {
               ],
             ),
           ),
-          SecimSatiri(secenekler: turler, secili: turler.contains(_tur) ? _tur : 'Hepsi',
+          SecimSatiri(etiket: 'Tür', secenekler: turler, secili: turler.contains(_tur) ? _tur : 'Hepsi',
               onSec: (s) => setState(() => _tur = s)),
           const SizedBox(height: 8),
           if (l.isEmpty)

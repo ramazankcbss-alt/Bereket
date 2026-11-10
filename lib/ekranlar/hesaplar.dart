@@ -203,6 +203,7 @@ class _HesaplarSayfasiState extends State<HesaplarSayfasi> {
           ),
           SecimSatiri(
             secenekler: turler,
+            etiket: 'Tür',
             secili: turler.contains(_tur) ? _tur : 'Hepsi',
             onSec: (s) => setState(() => _tur = s),
           ),

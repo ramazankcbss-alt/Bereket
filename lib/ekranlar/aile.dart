@@ -114,6 +114,7 @@ class _AileSayfasiState extends State<AileSayfasi> {
         return [
           SecimSatiri(
             secenekler: yillar,
+            etiket: 'Yıl',
             secili: yillar.contains(_yil) ? _yil : yillar[1],
             onSec: (s) => setState(() => _yil = s),
           ),

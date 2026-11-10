@@ -765,14 +765,38 @@ class SecimSatiri extends StatelessWidget {
     required this.secenekler,
     required this.secili,
     required this.onSec,
+    this.etiket,
   });
 
   final List<String> secenekler;
   final String secili;
   final ValueChanged<String> onSec;
 
+  /// Seçenekler ekrana sığmazsa açılır listenin başlığı.
+  final String? etiket;
+
   @override
   Widget build(BuildContext context) {
+    // Az ve kısa seçenek: yan yana düğmeler. Sığmayacaksa yana kaydırma
+    // yerine tek açılır liste (karışık görünmesin).
+    final uzunluk = secenekler.fold(0, (a, s) => a + s.length + 4);
+    if (secenekler.length > 4 || uzunluk > 34) {
+      final s = secenekler.contains(secili) ? secili : (secenekler.isEmpty ? null : secenekler.first);
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: DropdownButtonFormField<String>(
+          key: ValueKey('secim:${etiket ?? ''}:$s'),
+          initialValue: s,
+          isExpanded: true,
+          dropdownColor: Renk.kartAcik,
+          decoration: InputDecoration(labelText: etiket ?? 'Göster'),
+          items: [for (final x in secenekler) DropdownMenuItem(value: x, child: Text(x))],
+          onChanged: (x) {
+            if (x != null) onSec(x);
+          },
+        ),
+      );
+    }
     return SizedBox(
       height: 44,
       child: ListView(
@@ -788,6 +812,87 @@ class SecimSatiri extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// Liste halinde menü satırı: simge, başlık, kısa bilgi, sağda ok.
+class MenuOge {
+  const MenuOge(this.simge, this.baslik, this.alt, this.onTap, {this.rozet});
+  final String simge, baslik, alt;
+  final VoidCallback onTap;
+
+  /// Kırmızı küçük uyarı yazısı (ör. "Gecikmiş", "Maaş").
+  final String? rozet;
+}
+
+/// Alt alta menü satırları; isteğe bağlı başlıklı panel içinde.
+class ListeMenu extends StatelessWidget {
+  const ListeMenu({super.key, required this.ogeler, this.baslik});
+  final List<MenuOge> ogeler;
+  final String? baslik;
+
+  @override
+  Widget build(BuildContext context) {
+    return Panel(
+      baslik: baslik,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      child: Column(
+        children: [
+          for (var i = 0; i < ogeler.length; i++) ...[
+            if (i > 0) const Divider(height: 1),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+              leading: Text(ogeler[i].simge, style: const TextStyle(fontSize: 26)),
+              title: Text(ogeler[i].baslik, style: yaziKalin),
+              subtitle: Text(ogeler[i].alt, style: yaziSoluk),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (ogeler[i].rozet != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                          color: Renk.kirmizi, borderRadius: BorderRadius.circular(10)),
+                      child: Text(ogeler[i].rozet!,
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                    ),
+                  const Icon(Icons.chevron_right, color: Renk.soluk),
+                ],
+              ),
+              onTap: ogeler[i].onTap,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Kişi seçimi: yana kayan düğmeler yerine tek açılır liste.
+class KisiSecici extends StatelessWidget {
+  const KisiSecici(
+      {super.key, required this.kisiler, required this.secili, required this.onSec});
+  final List<String> kisiler;
+  final String secili;
+  final ValueChanged<String> onSec;
+
+  @override
+  Widget build(BuildContext context) {
+    if (kisiler.length <= 2) return const SizedBox.shrink();
+    final s = kisiler.contains(secili) ? secili : kisiler.first;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: DropdownButtonFormField<String>(
+        key: ValueKey('kisi:$s'),
+        initialValue: s,
+        isExpanded: true,
+        dropdownColor: Renk.kartAcik,
+        decoration: const InputDecoration(labelText: 'Kişi'),
+        items: [for (final k in kisiler) DropdownMenuItem(value: k, child: Text(k))],
+        onChanged: (k) => onSec(k ?? kisiler.first),
       ),
     );
   }

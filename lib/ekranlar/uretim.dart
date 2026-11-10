@@ -498,6 +498,7 @@ class _UretimSayfasiState extends State<UretimSayfasi> {
           // 1) Sezon: her şey seçilen yıla göre.
           SecimSatiri(
             secenekler: [for (final y in yillar) '$y'],
+            etiket: 'Sezon',
             secili: '$_yil',
             onSec: (s) => setState(() => _yil = int.parse(s)),
           ),
