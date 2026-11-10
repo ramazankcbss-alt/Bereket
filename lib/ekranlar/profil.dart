@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../servis/keles.dart';
 import '../bicim.dart';
 import '../hesap.dart';
 import '../sabitler.dart';
@@ -150,7 +151,10 @@ class ProfilSayfasi extends StatelessWidget {
                     Buton(
                       yazi: 'Çıkış Yap',
                       renk: ButonRenk.kirmizi,
-                      onTap: () => FirebaseAuth.instance.signOut(),
+                      onTap: () async {
+                await Keles.cikis();
+                await FirebaseAuth.instance.signOut();
+              },
                     ),
                     const SizedBox(height: 8),
                     Text(

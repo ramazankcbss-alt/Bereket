@@ -1,7 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 
-/// Keleş Satış'taki satışları okur (aynı Firebase projesi, aynı hesap).
-/// Bereket bu verileri yalnızca okur, hiçbir şeyi değiştirmez.
+import '../firebase_options.dart';
+
+/// Keleş Satış'taki satışları okur. Keleş Satış kendi Firebase projesindedir
+/// (keles-satis); Bereket ona ikinci bir Firebase uygulaması olarak bağlanır
+/// ve Keleş Satış hesabıyla giriş yapar. Bereket bu verileri yalnızca okur.
 class KelesSiparis {
   const KelesSiparis({
     required this.id,
@@ -40,24 +45,68 @@ class KelesSiparis {
   }
 }
 
+/// Keleş Satış'a giriş yapılmamışsa fırlatılır; ekran giriş penceresi açar.
+class KelesGirisGerekli implements Exception {
+  const KelesGirisGerekli();
+  @override
+  String toString() =>
+      'Keleş Satış siparişlerini görmek için Keleş Satış e-posta ve şifrenizle bir kez giriş yapın.';
+}
+
 class Keles {
   Keles._();
 
-  static final _db = FirebaseFirestore.instance;
+  static FirebaseApp? _app;
+
+  static Future<FirebaseApp> _uygulama() async {
+    if (_app != null) return _app!;
+    try {
+      _app = Firebase.app('keles');
+    } catch (_) {
+      _app = await Firebase.initializeApp(name: 'keles', options: DefaultFirebaseOptions.keles);
+    }
+    return _app!;
+  }
+
+  static Future<FirebaseAuth> _auth() async => FirebaseAuth.instanceFor(app: await _uygulama());
+  static Future<FirebaseFirestore> _db() async =>
+      FirebaseFirestore.instanceFor(app: await _uygulama());
+
+  /// Keleş Satış hesabına giriş.
+  static Future<void> girisYap(String eposta, String sifre) async {
+    await (await _auth()).signInWithEmailAndPassword(email: eposta.trim(), password: sifre);
+  }
+
+  /// Bereket'e girerken aynı e-posta ve şifreyle Keleş Satış'a da girmeyi dener;
+  /// olmazsa sessizce geçer.
+  static Future<void> sessizGiris(String eposta, String sifre) async {
+    try {
+      await girisYap(eposta, sifre);
+    } catch (_) {}
+  }
+
+  static Future<void> cikis() async {
+    try {
+      await (await _auth()).signOut();
+    } catch (_) {}
+  }
 
   /// Kullanıcının Keleş Satış'taki firma kimliği; yoksa boş.
   static Future<String> firmaId(String uid) async {
-    final d = await _db.collection('satis_kullanicilar').doc(uid).get();
+    final d = await (await _db()).collection('satis_kullanicilar').doc(uid).get();
     return (d.data()?['firmaId'] as String?) ?? '';
   }
 
+  /// [uid] eski sürümle uyum için duruyor; Keleş Satış'taki oturum kullanılır.
   static Future<List<KelesSiparis>> siparisler(String uid) async {
-    final fid = await firmaId(uid);
+    final kullanici = (await _auth()).currentUser;
+    if (kullanici == null) throw const KelesGirisGerekli();
+    final fid = await firmaId(kullanici.uid);
     if (fid.isEmpty) {
       throw 'Bu hesap Keleş Satış\'ta bir firmaya bağlı değil. '
-          'Keleş Satış\'a hangi e-postayla giriyorsanız Bereket\'e de onunla girin.';
+          'Keleş Satış\'a hangi e-postayla giriyorsanız onunla giriş yapın.';
     }
-    final s = await _db
+    final s = await (await _db())
         .collection('satis_firmalar')
         .doc(fid)
         .collection('siparisler')

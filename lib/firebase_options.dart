@@ -1,5 +1,6 @@
-// Firebase proje ayarları (egitim-takip-5a833).
-// google-services.json dosyasından oluşturuldu.
+// Firebase proje ayarları.
+// Bereket kendi projesini (bereket-86ea7) kullanır; Keleş Satış siparişleri
+// keles-satis projesinden yalnızca okunur.
 // Bu bilgiler gizli değildir; erişim güvenliği firestore.rules ile sağlanır.
 
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
@@ -13,10 +14,19 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyCc1S_Log_bfejrqZSF6btMyz1MeaPMUxs',
-    appId: '1:346066162484:android:0da3d7f5313e9e336bcb61',
-    messagingSenderId: '346066162484',
-    projectId: 'egitim-takip-5a833',
-    storageBucket: 'egitim-takip-5a833.firebasestorage.app',
+    apiKey: 'AIzaSyAyMQhaOUdPV1fYnKTErO8--uDRZo9JAMw',
+    appId: '1:569687039310:android:6c2feb3c94a28c60dd121f',
+    messagingSenderId: '569687039310',
+    projectId: 'bereket-86ea7',
+    storageBucket: 'bereket-86ea7.firebasestorage.app',
+  );
+
+  /// Keleş Satış projesi (siparişleri okumak için ikinci Firebase uygulaması).
+  static const FirebaseOptions keles = FirebaseOptions(
+    apiKey: 'AIzaSyB1rCK_lUftziSDt7zFTQ6P3ttXrkHJ1ZY',
+    appId: '1:23261241650:android:1939b0cc94e89feaeb372b',
+    messagingSenderId: '23261241650',
+    projectId: 'keles-satis',
+    storageBucket: 'keles-satis.firebasestorage.app',
   );
 }

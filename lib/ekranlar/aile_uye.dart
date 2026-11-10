@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../servis/keles.dart';
 import '../bicim.dart';
 import '../modeller.dart';
 import '../sabitler.dart';
@@ -336,7 +337,10 @@ class _AileUyeEkraniState extends State<AileUyeEkrani> {
                 Buton(
                   yazi: 'Çıkış Yap',
                   renk: ButonRenk.gri,
-                  onTap: () => FirebaseAuth.instance.signOut(),
+                  onTap: () async {
+                await Keles.cikis();
+                await FirebaseAuth.instance.signOut();
+              },
                 ),
               ],
             );

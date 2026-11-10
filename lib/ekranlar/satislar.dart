@@ -524,6 +524,47 @@ class _KelesAktarState extends State<KelesAktar> {
     }
   }
 
+  /// Keleş Satış hesabıyla giriş penceresi (Keleş Satış ayrı Firebase projesinde).
+  Future<void> _kelesGiris() async {
+    final eposta = TextEditingController();
+    final sifre = TextEditingController();
+    final tamam = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Keleş Satış girişi'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: eposta,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(labelText: 'E-posta'),
+            ),
+            TextField(
+              controller: sifre,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Şifre'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Vazgeç')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Giriş')),
+        ],
+      ),
+    );
+    final e = eposta.text.trim(), p = sifre.text;
+    eposta.dispose();
+    sifre.dispose();
+    if (tamam != true || e.isEmpty || p.isEmpty) return;
+    try {
+      await Keles.girisYap(e, p);
+      if (mounted) setState(() => _yukle = Keles.siparisler(durum.uid));
+    } catch (err) {
+      if (mounted) bildir(context, hataYazisi(err));
+    }
+  }
+
   Future<void> _gizle(KelesSiparis k, bool gizle) async {
     final l = _gizli(durum.v);
     if (gizle) {
@@ -558,11 +599,25 @@ class _KelesAktarState extends State<KelesAktar> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snap.hasError) {
+            final girisGerekli = snap.error is KelesGirisGerekli;
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
-                child: Text(hataYazisi(snap.error!),
-                    textAlign: TextAlign.center, style: const TextStyle(color: Renk.yazi)),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(girisGerekli ? snap.error.toString() : hataYazisi(snap.error!),
+                        textAlign: TextAlign.center, style: const TextStyle(color: Renk.yazi)),
+                    if (girisGerekli) ...[
+                      const SizedBox(height: 16),
+                      FilledButton.icon(
+                        onPressed: _kelesGiris,
+                        icon: const Icon(Icons.login),
+                        label: const Text('Keleş Satış\'a giriş yap'),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             );
           }

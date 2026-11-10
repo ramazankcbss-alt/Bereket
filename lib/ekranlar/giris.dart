@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../servis/guncelleme.dart';
+import '../servis/keles.dart';
 import '../servis/veri.dart';
 import '../tema.dart';
 
@@ -46,6 +47,8 @@ class _GirisEkraniState extends State<GirisEkrani> {
       } else {
         await a.signInWithEmailAndPassword(
             email: _eposta.text.trim(), password: _sifre.text);
+        // Keleş Satış ayrı projede; aynı hesapla oraya da girmeyi dene.
+        await Keles.sessizGiris(_eposta.text.trim(), _sifre.text);
       }
     } catch (e) {
       if (mounted) bildir(context, hataYazisi(e));

@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../servis/keles.dart';
 import '../servis/guncelleme.dart';
 import '../servis/veri.dart';
 import '../tema.dart';
@@ -128,7 +129,10 @@ class _FirmaKapiState extends State<_FirmaKapi> {
                         ),
                         const SizedBox(height: 8),
                         TextButton(
-                            onPressed: () => FirebaseAuth.instance.signOut(),
+                            onPressed: () async {
+                await Keles.cikis();
+                await FirebaseAuth.instance.signOut();
+              },
                             child: const Text('Çıkış yap')),
                       ],
                     ),
@@ -164,7 +168,10 @@ class _HataEkrani extends StatelessWidget {
                   Text(yazi, textAlign: TextAlign.center),
                   const SizedBox(height: 16),
                   TextButton(
-                      onPressed: () => FirebaseAuth.instance.signOut(),
+                      onPressed: () async {
+                await Keles.cikis();
+                await FirebaseAuth.instance.signOut();
+              },
                       child: const Text('Çıkış yap')),
                 ],
               ),
@@ -244,7 +251,10 @@ class _KurulumEkraniState extends State<KurulumEkrani> {
         title: const Text('Hoş geldiniz'),
         actions: [
           TextButton(
-              onPressed: () => FirebaseAuth.instance.signOut(),
+              onPressed: () async {
+                await Keles.cikis();
+                await FirebaseAuth.instance.signOut();
+              },
               child: const Text('Çıkış')),
         ],
       ),
