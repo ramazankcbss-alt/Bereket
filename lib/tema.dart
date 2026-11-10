@@ -819,9 +819,12 @@ class SecimSatiri extends StatelessWidget {
 
 /// Liste halinde menü satırı: simge, başlık, kısa bilgi, sağda ok.
 class MenuOge {
-  const MenuOge(this.simge, this.baslik, this.alt, this.onTap, {this.rozet});
+  const MenuOge(this.simge, this.baslik, this.alt, this.onTap, {this.rozet, this.renk});
   final String simge, baslik, alt;
   final VoidCallback onTap;
+
+  /// Kare menüde kartın rengi.
+  final Color? renk;
 
   /// Kırmızı küçük uyarı yazısı (ör. "Gecikmiş", "Maaş").
   final String? rozet;
@@ -893,6 +896,116 @@ class KisiSecici extends StatelessWidget {
         decoration: const InputDecoration(labelText: 'Kişi'),
         items: [for (final k in kisiler) DropdownMenuItem(value: k, child: Text(k))],
         onChanged: (k) => onSec(k ?? kisiler.first),
+      ),
+    );
+  }
+}
+
+/// Başlıklı bölüm + üçlü kare menü: her kare kendi renginde, simge, ad,
+/// kısa bilgi ve gerekirse köşede kırmızı uyarı.
+class KareMenu extends StatelessWidget {
+  const KareMenu({super.key, required this.baslik, required this.ogeler});
+  final String baslik;
+  final List<MenuOge> ogeler;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 8),
+            child: Text(baslik.toUpperCase(),
+                style: const TextStyle(
+                    color: Renk.soluk,
+                    fontSize: 12.5,
+                    letterSpacing: 1.2,
+                    fontWeight: FontWeight.w800)),
+          ),
+          LayoutBuilder(builder: (context, c) {
+            const ara = 10.0;
+            final w = (c.maxWidth - ara * 2) / 3;
+            return Wrap(
+              spacing: ara,
+              runSpacing: ara,
+              children: [for (final o in ogeler) SizedBox(width: w, height: w * 1.12, child: _kare(o))],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _kare(MenuOge o) {
+    final r = o.renk ?? Renk.mavi;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: o.onTap,
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [r.withValues(alpha: 0.42), r.withValues(alpha: 0.12)],
+            ),
+            border: Border.all(color: r.withValues(alpha: 0.55), width: 1.2),
+          ),
+          child: Stack(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.22),
+                        borderRadius: BorderRadius.circular(13),
+                      ),
+                      child: Text(o.simge, style: const TextStyle(fontSize: 24)),
+                    ),
+                    const Spacer(),
+                    Text(o.baslik,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: Renk.yazi, fontSize: 14.5, height: 1.15, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 3),
+                    Text(o.alt,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: Renk.yazi.withValues(alpha: 0.7), fontSize: 11.5, height: 1.2)),
+                  ],
+                ),
+              ),
+              if (o.rozet != null)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 70),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                        color: Renk.kirmizi, borderRadius: BorderRadius.circular(10)),
+                    child: Text(o.rozet!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w800)),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
