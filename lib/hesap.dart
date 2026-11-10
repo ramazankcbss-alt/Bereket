@@ -237,15 +237,75 @@ class Veriler {
     return out;
   }
 
-  /// Başkasına verilen tarlaların yıllık kira geliri (kişiye göre).
-  double kiraGeliri(String sahip) {
+  /// Başkasına verilen tarlaların kira geliri (kişiye göre). Ekimde "Kim
+  /// ekiyor: Başkası" seçilen yıllar ve eski kayıtlarda tarlada işaretlenenler.
+  double kiraGeliri(String sahip, {int? yil}) {
     var t = 0.0;
     for (final x in tarlalar) {
       if (x.s('sahip') != baskasi) continue;
       final g = x.s('gelirSahibi').isEmpty ? ben : x.s('gelirSahibi');
       if (g == sahip) t += x.n('kiraGeliri');
     }
+    for (final e in ekimler) {
+      if (e.s('sahip') != baskasi || (yil != null && e.t('yil') != yil)) continue;
+      final g = e.s('gelirSahibi').isEmpty ? ben : e.s('gelirSahibi');
+      if (g == sahip) t += e.n('kiraGeliri');
+    }
     return t;
+  }
+
+  // Arazi bilgileri her yılın ekiminde sorulur; eski kayıtlarda tarladadır.
+
+  /// Tarlanın o yılki ekimi (varsa).
+  Kayit? yilEkimi(String tarlaId, int yil) {
+    for (final e in ekimler) {
+      if (e.s('tarlaId') == tarlaId && e.t('yil') == yil) return e;
+    }
+    return null;
+  }
+
+  String _ekimYaDaTarla(Kayit? e, String tarlaId, String alan) {
+    final x = e?.s(alan) ?? '';
+    return x.isNotEmpty ? x : (tarla(tarlaId)?.s(alan) ?? '');
+  }
+
+  /// Ekimin arazi durumu (Kendi, Kiralık, Hazine...).
+  String ekimMulkiyet(Kayit e) {
+    final m = _ekimYaDaTarla(e, e.s('tarlaId'), 'mulkiyet');
+    return m.isEmpty ? 'Kendi' : m;
+  }
+
+  /// Ekimin ÇKS sahibi.
+  String ekimCks(Kayit e) => _ekimYaDaTarla(e, e.s('tarlaId'), 'cks');
+
+  /// Bu ekime düşen yıllık kira / ecrimisil bedeli: ekimde girildiyse o,
+  /// eski kayıtlarda tarlanın yıllık bedelinden alan payı.
+  double ekimKira(Kayit e) {
+    if (e.s('mulkiyet').isNotEmpty) {
+      final m = e.s('mulkiyet');
+      return (m == 'Kendi' || m == 'Ortak') ? 0 : e.n('kira');
+    }
+    return (tarla(e.s('tarlaId'))?.n('kira') ?? 0) * ekimOrani(e);
+  }
+
+  /// Tarlanın o yılki arazi durumu / ÇKS sahibi (ekran ve filtreler için).
+  String araziDurumu(String tarlaId, int yil) {
+    final e = yilEkimi(tarlaId, yil);
+    if (e != null) return ekimMulkiyet(e);
+    final m = tarla(tarlaId)?.s('mulkiyet') ?? '';
+    return m.isEmpty ? 'Kendi' : m;
+  }
+
+  String cksSahibi(String tarlaId, int yil) =>
+      _ekimYaDaTarla(yilEkimi(tarlaId, yil), tarlaId, 'cks');
+
+  double yillikKira(String tarlaId, int yil) => ekimler
+      .where((e) => e.s('tarlaId') == tarlaId && e.t('yil') == yil)
+      .fold(0.0, (a, e) => a + ekimKira(e));
+
+  bool kirayaVerildi(String tarlaId, int yil) {
+    final e = yilEkimi(tarlaId, yil);
+    return e != null ? e.s('sahip') == baskasi : tarla(tarlaId)?.s('sahip') == baskasi;
   }
 
   /// Giderin ne kadarı bu kişiye düşüyor (0..1). Tarlaya bağlı olmayan
@@ -285,7 +345,7 @@ class Veriler {
       });
       o.hasatKg += z.hasatKg * p;
     }
-    o.kiraGeliri = kiraGeliri(sahip);
+    o.kiraGeliri = kiraGeliri(sahip, yil: yil);
     for (final h in aileHareketleri) {
       if (h.s('kisi') != sahip) continue;
       if (yil != null && h.yil != yil) continue;
@@ -362,13 +422,13 @@ class Veriler {
     for (final e in ekimler) {
       if (!yilda(e.t('yil'))) continue;
       final t = tarla(e.s('tarlaId'));
-      if (t == null || t.n('kira') <= 0) continue;
+      final tutar = ekimKira(e);
+      if (t == null || tutar <= 0) continue;
       final kiraVar = giderler.any((g) =>
           g.yil == e.t('yil') &&
           (g.s('kalem') == 'Arazi Kirası' || g.s('kalem') == 'Ecrimisil') &&
           g.l('tarlaIds').contains(t.id));
       if (kiraVar) continue;
-      final tutar = t.n('kira') * ekimOrani(e);
       k(ben).odedi += tutar;
       ekimPaylari(e).forEach((ad, p) => k(ad).yuk += tutar * p);
     }
@@ -608,10 +668,11 @@ class Veriler {
       }
     }
     // Kiralık tarlanın yıllık kirası, ayrıca gider girilmediyse eklenir.
-    if (t != null && !kiraGiderVar && t.n('kira') > 0) {
+    final kira = ekimKira(ekim);
+    if (t != null && !kiraGiderVar && kira > 0) {
       final k = kalemler.putIfAbsent(
-          kiraKalemi(t.s('mulkiyet')), () => KalemToplam('dekar'));
-      k.tutar += t.n('kira') * eo;
+          kiraKalemi(ekimMulkiyet(ekim)), () => KalemToplam('dekar'));
+      k.tutar += kira;
       k.miktar += ed;
     }
     var destek = 0.0;
@@ -699,8 +760,9 @@ class Veriler {
     final t = tarla(tarlaId);
     final eken = tarlaYilPaylari(tarlaId, g.yil);
     if (t == null || !alanBazliDestekler.contains(g.s('destekTuru'))) return eken;
-    final m = t.s('mulkiyet');
-    if (m.isNotEmpty && m != 'Kendi') return eken;
+    final yE = yilEkimi(tarlaId, g.yil);
+    final m = araziDurumu(tarlaId, g.yil);
+    if (m != 'Kendi') return eken;
     final ekimde = ekimler
         .where((e) =>
             e.s('tarlaId') == tarlaId && e.t('yil') == g.yil && e.s('destekSahibi').isNotEmpty)
@@ -709,7 +771,7 @@ class Veriler {
     if (ekimde.isNotEmpty) return {ekimde.first: 1};
     final secilen = t.s('destekSahibi');
     if (secilen.isNotEmpty) return {secilen: 1};
-    final cks = t.s('cks');
+    final cks = _ekimYaDaTarla(yE, tarlaId, 'cks');
     if (cks.isEmpty || cks == cksBizdeDegil) return eken;
     return {cks: 1};
   }
@@ -892,15 +954,16 @@ class Veriler {
       }
     }
     // Ayrıca gider girilmemiş kiralık tarla kiraları.
-    for (final t in tarlalar) {
-      final kp = tarlaYilPaylari(t.id, yil)[sahip] ?? 0;
-      if (t.n('kira') <= 0 || kp <= 0) continue;
-      final ekili = ekimler.any((e) => e.s('tarlaId') == t.id && e.t('yil') == yil);
+    for (final e in ekimler) {
+      if (e.t('yil') != yil) continue;
+      final kp = ekimPaylari(e)[sahip] ?? 0;
+      final kira = ekimKira(e);
+      if (kira <= 0 || kp <= 0) continue;
       final kiraVar = giderler.any((g) =>
           g.yil == yil &&
           (g.s('kalem') == 'Arazi Kirası' || g.s('kalem') == 'Ecrimisil') &&
-          g.l('tarlaIds').contains(t.id));
-      if (ekili && !kiraVar) o.tarimGider += t.n('kira') * kp;
+          g.l('tarlaIds').contains(e.s('tarlaId')));
+      if (!kiraVar) o.tarimGider += kira * kp;
     }
     for (final g in gelirler) {
       if (g.yil != yil) continue;
@@ -915,7 +978,7 @@ class Veriler {
         o.digerGelir += g.n('tutar');
       }
     }
-    o.kiraGeliri = kiraGeliri(sahip);
+    o.kiraGeliri = kiraGeliri(sahip, yil: yil);
     o.ekiliDekar = ekimler.where((e) => e.t('yil') == yil && ekili(e)).fold(
         0.0, (a, e) => a + ekimDekar(e) * (ekimPaylari(e)[sahip] ?? 0));
     // Kiralanan pancar kotası bedeli.

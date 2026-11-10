@@ -467,6 +467,21 @@ class _UretimSayfasiState extends State<UretimSayfasi> {
                             onTap: () => git(context, BelgeOkut(durum: durum)))),
                   ],
                 ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                        child: Buton(
+                            yazi: 'ÇKS Yükle',
+                            renk: ButonRenk.yesil,
+                            onTap: () => cksBilgi(context, durum))),
+                    const SizedBox(width: 10),
+                    Expanded(
+                        child: Buton(
+                            yazi: 'Ne Ekeyim?',
+                            onTap: () => neEkeyimSec(context, durum))),
+                  ],
+                ),
                 const SizedBox(height: 12),
                 Row(
                   children: [

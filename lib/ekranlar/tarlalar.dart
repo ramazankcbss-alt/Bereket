@@ -40,33 +40,20 @@ void ortakTopla(Map<String, dynamic> d) {
   d['ortaklar'] = m;
 }
 
-/// Tarla ekle / düzenle. Burada yalnızca arazi bilgisi girilir; kimin
-/// ektiği, ortaklık ve destek sahibi her yılın ekiminde (Üretim Merkezi) sorulur.
+/// Tarla ekle / düzenle. Burada yalnızca konum, ada/parsel ve alan girilir;
+/// ÇKS sahibi, arazinin durumu, kira, kim ektiği ve ortaklık her yılın
+/// ekiminde (Üretim Merkezi) sorulur.
 Future<void> tarlaFormu(BuildContext context, Durum durum, {Kayit? tarla}) async {
   await Idari.yukle();
   if (!context.mounted) return;
   final v = durum.v;
-  final sahipler = v.sahipler();
   final bas = <String, dynamic>{
-    'cks': 'Babam',
-    'mulkiyet': 'Kendi',
     'il': 'Konya',
     'ilce': 'Karapınar',
-    'gelirSahibi': Veriler.ben,
     ...?tarla?.d,
   };
   if ((bas['il'] ?? '').toString().isEmpty) bas['il'] = 'Konya';
-  bas['kirayaVerildi'] = bas['sahip'] == baskasi;
-  bool kiralik(Map<String, dynamic> d) =>
-      (d['mulkiyet'] ?? '').toString() != 'Kendi' &&
-      (d['mulkiyet'] ?? '').toString() != 'Ortak';
-  bool verildi(Map<String, dynamic> d) => d['kirayaVerildi'] == true;
   String s(Map<String, dynamic> d, String k) => (d[k] ?? '').toString();
-  final kiraVerenler = <String>{
-    'Milli Emlak',
-    for (final t in v.tarlalar)
-      if (t.s('kiraVeren').isNotEmpty) t.s('kiraVeren'),
-  }.toList();
   final liste = Idari.hazir;
   return formAc(
     context,
@@ -89,20 +76,6 @@ Future<void> tarlaFormu(BuildContext context, Durum durum, {Kayit? tarla}) async
       const Alan('ada', 'Ada'),
       const Alan('parsel', 'Parsel'),
       const Alan('dekar', 'Alan (ÇKS)', tip: AlanTip.sayi, birim: 'dekar', zorunlu: true),
-      Alan('cks', 'ÇKS kimin üzerine', tip: AlanTip.secim,
-          secenekler: [...sahipler, cksBizdeDegil]),
-      const Alan('mulkiyet', 'Arazinin durumu', tip: AlanTip.secim, secenekler: mulkiyetler),
-      Alan('kira', 'Yıllık kira / ecrimisil bedeli',
-          tip: AlanTip.sayi, birim: '₺', gorunur: kiralik,
-          aciklama: 'Her yıl bu tarlanın maliyetine eklenir.'),
-      Alan('kiraVeren', 'Kime ödeniyor', gorunur: kiralik, oneriler: kiraVerenler),
-      const Alan('kirayaVerildi', 'Başkasına kiraya verildi', tip: AlanTip.anahtar,
-          ipucu: 'Tarlayı başkası ekiyor, biz kira alıyoruz.'),
-      Alan('kiraci', 'Kiracının adı', gorunur: verildi),
-      Alan('kiraGeliri', 'Aldığımız yıllık kira', tip: AlanTip.sayi, birim: '₺',
-          gorunur: verildi),
-      Alan('gelirSahibi', 'Kira geliri kimin', tip: AlanTip.secim,
-          secenekler: sahipler, gorunur: verildi),
       const Alan('not', 'Not', tip: AlanTip.uzun),
     ],
     degisince: (key, d) {
@@ -114,19 +87,9 @@ Future<void> tarlaFormu(BuildContext context, Durum durum, {Kayit? tarla}) async
         d['mahalle'] = '';
       }
     },
-    // Ürünler burada girilmez: her yılın ürünü ekim kayıtlarından gelir.
-    // Eski sürümde girilmiş 'gecmis', 'sahip', 'ortaklar' bilgisi korunur.
-    onKaydet: (d) async {
-      final kiraya = d.remove('kirayaVerildi') == true;
-      if (kiraya) {
-        d['sahip'] = baskasi;
-      } else {
-        if (d['sahip'] == baskasi) d['sahip'] = '';
-        d['kiraci'] = null;
-        d['kiraGeliri'] = null;
-      }
-      await durum.kaydet('tarlalar', d, id: tarla?.id);
-    },
+    // Eski sürümde tarlaya girilmiş bilgiler (ÇKS, arazi durumu, kira,
+    // kim ekiyor...) korunur; o yılın ekiminde seçim yoksa onlar geçerlidir.
+    onKaydet: (d) => durum.kaydet('tarlalar', d, id: tarla?.id),
     onSil: tarla == null ? null : () => durum.sil('tarlalar', tarla.id),
   );
 }
@@ -148,6 +111,28 @@ Future<String?> yeniKisi(BuildContext context, Durum durum) async {
   return s;
 }
 
+/// Yeni ekimde arazi bilgisinin ilk değeri: tarlanın son ekimindeki ya da
+/// eski kayıtlarda tarlaya girilmiş bilgi.
+Map<String, dynamic>? araziVarsayilan(Veriler v, String? tarlaId) {
+  if (tarlaId == null || tarlaId.isEmpty) return null;
+  final t = v.tarla(tarlaId);
+  if (t == null) return null;
+  final son = v.tarlaEkimleri(tarlaId).where((e) => e.s('mulkiyet').isNotEmpty).firstOrNull;
+  String al(String k, String vars) {
+    final x = son?.s(k) ?? '';
+    if (x.isNotEmpty) return x;
+    final y = t.s(k);
+    return y.isNotEmpty ? y : vars;
+  }
+  final kira = (son?.n('kira') ?? 0) > 0 ? son!.n('kira') : t.n('kira');
+  return {
+    'cks': al('cks', Veriler.ben),
+    'mulkiyet': al('mulkiyet', 'Kendi'),
+    if (kira > 0) 'kira': kira,
+    if (al('kiraVeren', '').isNotEmpty) 'kiraVeren': al('kiraVeren', ''),
+  };
+}
+
 /// Ekim / hasat kaydı. Gelecek yılın sezonu seçilirse durum "Ekim planlanıyor" olur
 /// (ÇKS'de gelecek yılın ürünü bu yılın başvuru döneminde yazılır).
 Future<void> ekimFormu(BuildContext context, Durum durum,
@@ -165,9 +150,21 @@ Future<void> ekimFormu(BuildContext context, Durum durum,
     'tarlaId': tarlaId ?? '',
     if (urun != null) 'urun': urun,
     'sahip': tarlaId == null ? '' : v.tarlaSahibi(tarlaId),
+    'gelirSahibi': Veriler.ben,
+    ...?araziVarsayilan(v, tarlaId),
     ...?ekim?.d,
   };
-  if (bas['sahip'] == baskasi) bas['sahip'] = Veriler.ben;
+  if (ekim != null && ekim.s('mulkiyet').isEmpty) bas.addAll(araziVarsayilan(v, ekim.s('tarlaId')) ?? {});
+  final kiraVerenler = <String>{
+    'Milli Emlak',
+    for (final x in [...v.tarlalar, ...v.ekimler])
+      if (x.s('kiraVeren').isNotEmpty) x.s('kiraVeren'),
+  }.toList();
+  bool kiralik(Map<String, dynamic> d) {
+    final m = (d['mulkiyet'] ?? '').toString();
+    return m.isNotEmpty && m != 'Kendi' && m != 'Ortak';
+  }
+  bool verildi(Map<String, dynamic> d) => d['sahip'] == baskasi;
   bas['farkliAlan'] = (ekim?.n('dekar') ?? 0) > 0;
   if (ekim != null) ortakDoldur(bas, ekim.m('ortaklar'));
   int yilOf(Map<String, dynamic> d) =>
@@ -195,18 +192,31 @@ Future<void> ekimFormu(BuildContext context, Durum durum,
           aciklama: 'Giderler aynı tarladaki ekimlere bu alanlara göre bölünür.'),
       Alan('urun', 'Ürün', tip: AlanTip.secim,
           secenekler: [for (final u in urunler) u.ad], zorunlu: true),
+      Alan('cks', 'ÇKS kimin üzerine', tip: AlanTip.secim,
+          secenekler: [...v.sahipler(), cksBizdeDegil]),
       Alan('sahip', 'Kim ekiyor', tip: AlanTip.secim,
-          secenekler: v.sahipler(),
+          secenekler: [...v.sahipler(), baskasi],
           yeniYazi: '+ Yeni kişi',
           yeniEkle: (c) => yeniKisi(c, durum),
-          aciklama: 'Maliyet, satış ve kâr bu kişinin hesabına yazılır.'),
-      ...ortakAlanlari(v.sahipler()),
+          aciklama: 'Maliyet, satış ve kâr bu kişinin hesabına yazılır. '
+              '"Başkası": tarlayı kiraya verdik.'),
+      ...ortakAlanlari(v.sahipler(), gorunur: (d) => !verildi(d)),
+      Alan('kiraci', 'Kiracının adı', gorunur: verildi),
+      Alan('kiraGeliri', 'Aldığımız kira', tip: AlanTip.sayi, birim: '₺', gorunur: verildi),
+      Alan('gelirSahibi', 'Kira geliri kimin', tip: AlanTip.secim,
+          secenekler: v.sahipler(), gorunur: verildi),
+      Alan('mulkiyet', 'Arazinin durumu', tip: AlanTip.secim, secenekler: mulkiyetler,
+          gorunur: (d) => !verildi(d),
+          aciklama: 'Aileden biri kendi arazisini ekiyorsa "Kendi"; '
+              'başkasının arazisini kiraladıysak "Kiralık".'),
+      Alan('kira', 'Kira / ecrimisil bedeli', tip: AlanTip.sayi, birim: '₺',
+          gorunur: (d) => !verildi(d) && kiralik(d),
+          aciklama: 'Bu ekimin maliyetine eklenir (ayrıca gider girilmediyse).'),
+      Alan('kiraVeren', 'Kime ödeniyor', oneriler: kiraVerenler,
+          gorunur: (d) => !verildi(d) && kiralik(d)),
       Alan('destekSahibi', 'Mazot-gübre desteği kimin', tip: AlanTip.secim,
           secenekler: ['', ...v.sahipler()],
-          gorunur: (d) {
-            final m = v.tarla((d['tarlaId'] ?? '').toString())?.s('mulkiyet') ?? '';
-            return m.isEmpty || m == 'Kendi';
-          },
+          gorunur: (d) => !verildi(d) && !kiralik(d),
           aciklama: 'Boşsa ÇKS sahibine yazılır. Ürün desteği her zaman ekene yazılır.'),
       const Alan('durum', 'Durum', tip: AlanTip.secim, secenekler: ekimDurumlari),
       Alan('ekimTarihi', 'Ekim tarihi', tip: AlanTip.tarih,
@@ -251,10 +261,12 @@ Future<void> ekimFormu(BuildContext context, Durum durum,
     },
     degisince: (key, d) {
       // Farklı alan seçilince kalan alanı öner (tarla ikiye bölünüyorsa).
-      if (key == 'tarlaId') {
+      if (key == 'tarlaId' && ekim == null) {
         final id = (d['tarlaId'] ?? '').toString();
-        final s = v.tarlaSahibi(id);
-        if (id.isNotEmpty && ekim == null) d['sahip'] = s == baskasi ? Veriler.ben : s;
+        if (id.isNotEmpty) {
+          d['sahip'] = v.tarlaSahibi(id);
+          d.addAll(araziVarsayilan(v, id) ?? {});
+        }
       }
       if (key == 'farkliAlan' || key == 'tarlaId' || key == 'yil') {
         final t = v.tarla((d['tarlaId'] ?? '').toString());
@@ -274,6 +286,16 @@ Future<void> ekimFormu(BuildContext context, Durum durum,
     },
     onKaydet: (d) async {
       if (d.remove('farkliAlan') != true) d['dekar'] = null;
+      if (d['sahip'] == baskasi) {
+        d['ortaklar'] = null;
+      } else {
+        d['kiraci'] = null;
+        d['kiraGeliri'] = null;
+      }
+      if (!kiralik(d)) {
+        d['kira'] = null;
+        d['kiraVeren'] = null;
+      }
       if (d['durum'] == ekimPlanlaniyor) d['ekimTarihi'] = null;
       if (d['durum'] != 'Hasat edildi') {
         d['hasatKg'] = null;
@@ -387,6 +409,46 @@ Future<void> neEkeyim(BuildContext context, Durum durum, Kayit tarla) {
   );
 }
 
+/// ÇKS Yükle (Üretim Merkezi'nde).
+void cksBilgi(BuildContext context, Durum durum) {
+  showDialog<void>(
+    context: context,
+    builder: (c) => AlertDialog(
+      title: const Text('ÇKS Yükle'),
+      content: const Text(
+        'ÇKS belgesini (e-Devlet ya da Ziraat Odası çıktısı) otomatik okuma, '
+        'örnek bir belge gönderdiğinizde bir sonraki sürümde eklenecek.\n\n'
+        'Şimdilik parselleri Tarlalarım\'dan "Tarla Ekle" ile girin (ada, parsel, dekar). '
+        'Her yılın ürününü, ÇKS sahibini ve arazi durumunu "Yeni Ekim" ile yazın; '
+        'gelecek yıl için ÇKS\'ye yazdığınız ürün "Ekim planlanıyor" olarak kaydedilir.',
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(c), child: const Text('Tamam')),
+        FilledButton(
+          onPressed: () {
+            Navigator.pop(c);
+            ekimFormu(context, durum,
+                yil: DateTime.now().month >= 8 ? DateTime.now().year + 1 : DateTime.now().year);
+          },
+          child: const Text('Ekim Gir'),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Ne Ekeyim? için tarla seçtirir (Üretim Merkezi'nde).
+Future<void> neEkeyimSec(BuildContext context, Durum durum) async {
+  final v = durum.v;
+  if (v.tarlalar.isEmpty) {
+    bildir(context, 'Önce Tarlalarım\'dan tarla ekleyin.');
+    return;
+  }
+  final adlar = {for (final t in v.tarlalar) v.tarlaEtiketi(t.id): t};
+  final s = await secimYap(context, 'Hangi tarla?', adlar.keys.toList());
+  if (s != null && context.mounted) await neEkeyim(context, durum, adlar[s]!);
+}
+
 class TarlalarSayfasi extends StatefulWidget {
   const TarlalarSayfasi({super.key, required this.durum});
   final Durum durum;
@@ -402,60 +464,24 @@ class _TarlalarSayfasiState extends State<TarlalarSayfasi> {
   Durum get durum => widget.durum;
 
   bool _uyar(Veriler v, Kayit t) {
-    final s = v.tarlaSahibi(t.id);
-    final m = t.s('mulkiyet');
+    final yil = DateTime.now().year;
+    final p = v.tarlaYilPaylari(t.id, yil);
+    final s = p.length == 1 ? p.keys.first : '';
+    final m = v.araziDurumu(t.id, yil);
     switch (_filtre) {
       case 'Hepsi':
         return true;
       case 'Benim ektiklerim':
-        return s == Veriler.ben;
+        return p.containsKey(Veriler.ben) && !v.kirayaVerildi(t.id, yil);
       case 'Kiraladıklarımız':
         return m == 'Kiralık' || m.startsWith('Hazine');
       case 'Başkasına verilenler':
-        return s == baskasi;
+        return v.kirayaVerildi(t.id, yil);
       case 'ÇKS bizde olmayanlar':
-        return t.s('cks') == cksBizdeDegil;
+        return v.cksSahibi(t.id, yil) == cksBizdeDegil;
       default:
-        return s == _filtre;
+        return p.containsKey(_filtre);
     }
-  }
-
-  void _cksBilgi() {
-    showDialog<void>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('ÇKS Yükle'),
-        content: const Text(
-          'ÇKS belgesini (e-Devlet ya da Ziraat Odası çıktısı) otomatik okuma, '
-          'örnek bir belge gönderdiğinizde bir sonraki sürümde eklenecek.\n\n'
-          'Şimdilik parselleri "Tarla Ekle" ile girin (ada, parsel, dekar). '
-          'Ürünleri "Ekim Gir" ile sezonuna göre yazın; gelecek yıl için ÇKS\'ye '
-          'yazdığınız ürün "Ekim planlanıyor" olarak kaydedilir. Münavebe ve '
-          '"Ne ekeyim?" bu bilgiyle çalışır.',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c), child: const Text('Tamam')),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(c);
-              tarlaFormu(context, durum);
-            },
-            child: const Text('Tarla Ekle'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _neEkeyimSec() async {
-    final v = durum.v;
-    if (v.tarlalar.isEmpty) {
-      bildir(context, 'Önce tarla ekleyin.');
-      return;
-    }
-    final adlar = {for (final t in v.tarlalar) v.tarlaAdi(t.id): t};
-    final s = await secimYap(context, 'Hangi tarla?', adlar.keys.toList());
-    if (s != null && mounted) await neEkeyim(context, durum, adlar[s]!);
   }
 
   @override
@@ -495,19 +521,6 @@ class _TarlalarSayfasiState extends State<TarlalarSayfasi> {
             child: Column(
               children: [
                 const Text('🗺️', style: TextStyle(fontSize: 56)),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Buton(
-                          yazi: 'ÇKS Yükle', renk: ButonRenk.yesil, onTap: _cksBilgi),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Buton(yazi: 'Ne Ekeyim?', onTap: _neEkeyimSec),
-                    ),
-                  ],
-                ),
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -571,12 +584,19 @@ class _TarlalarSayfasiState extends State<TarlalarSayfasi> {
     final buYilYazi = buYilEkim.isEmpty
         ? buYilUrun
         : buYilEkim.map(urunYazi).join(', ');
-    final sahip = v.tarlaSahibi(t.id);
-    final paylar = sahip == baskasi ? {baskasi: 1.0} : v.tarlaYilPaylari(t.id, yil);
+    final verildi = v.kirayaVerildi(t.id, yil);
+    final paylar = verildi ? {baskasi: 1.0} : v.tarlaYilPaylari(t.id, yil);
     final eken = paylar.length == 1 ? paylar.keys.first : null;
     final m = buYilUrun == null ? null : v.munavebe(t, buYilUrun, yil);
     final ekimler = v.tarlaEkimleri(t.id);
-    final kira = t.n('kira');
+    final kira = v.yillikKira(t.id, yil);
+    final arazi = v.araziDurumu(t.id, yil);
+    final cks = v.cksSahibi(t.id, yil);
+    final buEkim = v.yilEkimi(t.id, yil);
+    final kiraci = (buEkim?.s('kiraci').isNotEmpty ?? false) ? buEkim!.s('kiraci') : t.s('kiraci');
+    final kiraGeliri = buEkim != null && buEkim.s('sahip') == baskasi
+        ? buEkim.n('kiraGeliri')
+        : t.n('kiraGeliri');
     return Panel(
         onTap: () => tarlaFormu(context, durum, tarla: t),
         padding: const EdgeInsets.all(14),
@@ -619,8 +639,8 @@ class _TarlalarSayfasiState extends State<TarlalarSayfasi> {
                     children: [
                       Satir('Ada / Parsel', '${t.s('ada').isEmpty ? '-' : t.s('ada')} / ${t.s('parsel').isEmpty ? '-' : t.s('parsel')}'),
                       Satir('Alan', '${sayi(t.n('dekar'))} dekar'),
-                      Satir('Arazi', t.s('mulkiyet').isEmpty ? 'Kendi' : t.s('mulkiyet')),
-                      if (kira > 0) Satir(kiraKalemi(t.s('mulkiyet')), tl0(kira)),
+                      Satir('Arazi', arazi),
+                      if (kira > 0) Satir(kiraKalemi(arazi), tl0(kira)),
                       Satir('$yil',
                           buYilUrun == null
                               ? 'Ekilmedi'
@@ -638,16 +658,16 @@ class _TarlalarSayfasiState extends State<TarlalarSayfasi> {
               spacing: 6,
               runSpacing: 6,
               children: [
-                Etiket('ÇKS: ${t.s('cks').isEmpty ? '-' : t.s('cks')}', renk: Renk.mor),
+                Etiket('ÇKS: ${cks.isEmpty ? '-' : cks}', renk: Renk.mor),
                 Etiket(
-                    sahip == baskasi
-                        ? 'Eken: ${t.s('kiraci').isEmpty ? baskasi : t.s('kiraci')}'
+                    verildi
+                        ? 'Eken: ${kiraci.isEmpty ? baskasi : kiraci}'
                         : (eken == null
                             ? 'Ortak: ${paylar.entries.map((e) => '${e.key} %${(e.value * 100).round()}').join(', ')}'
                             : 'Eken: $eken'),
                     renk: eken == Veriler.ben ? Renk.yesilKoyu : Renk.maviKoyu),
-                if (sahip == baskasi && t.n('kiraGeliri') > 0)
-                  Etiket('Kira geliri ${tl0(t.n('kiraGeliri'))}', renk: Renk.turkuaz),
+                if (verildi && kiraGeliri > 0)
+                  Etiket('Kira geliri ${tl0(kiraGeliri)}', renk: Renk.turkuaz),
               ],
             ),
             if (yillar.any((y) => y < yil)) ...[
@@ -689,15 +709,6 @@ class _TarlalarSayfasiState extends State<TarlalarSayfasi> {
                         git(context, EkimDetay(durum: durum, ekimId: buYil.first.id));
                       }
                     },
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Buton(
-                    yazi: 'Ne Ekeyim?',
-                    renk: ButonRenk.mor,
-                    yukseklik: 44,
-                    onTap: () => neEkeyim(context, durum, t),
                   ),
                 ),
               ],
