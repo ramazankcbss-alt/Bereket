@@ -466,7 +466,6 @@ class _TarlalarSayfasiState extends State<TarlalarSayfasi> {
   bool _uyar(Veriler v, Kayit t) {
     final yil = DateTime.now().year;
     final p = v.tarlaYilPaylari(t.id, yil);
-    final s = p.length == 1 ? p.keys.first : '';
     final m = v.araziDurumu(t.id, yil);
     switch (_filtre) {
       case 'Hepsi':
