@@ -75,7 +75,8 @@ Future<void> tarlaFormu(BuildContext context, Durum durum, {Kayit? tarla}) async
       ],
       const Alan('ada', 'Ada'),
       const Alan('parsel', 'Parsel'),
-      const Alan('dekar', 'Alan (ÇKS)', tip: AlanTip.sayi, birim: 'dekar', zorunlu: true),
+      const Alan('dekar', 'Alan (ÇKS)', tip: AlanTip.sayi, birim: 'dekar', zorunlu: true,
+          aciklama: 'ÇKS\'de m² yazar: 1000\'e bölün (40.000 m² = 40 dekar).'),
       const Alan('not', 'Not', tip: AlanTip.uzun),
     ],
     degisince: (key, d) {
@@ -89,7 +90,20 @@ Future<void> tarlaFormu(BuildContext context, Durum durum, {Kayit? tarla}) async
     },
     // Eski sürümde tarlaya girilmiş bilgiler (ÇKS, arazi durumu, kira,
     // kim ekiyor...) korunur; o yılın ekiminde seçim yoksa onlar geçerlidir.
-    onKaydet: (d) => durum.kaydet('tarlalar', d, id: tarla?.id),
+    ozet: (d) {
+      final da = d['dekar'] is num ? (d['dekar'] as num).toDouble() : 0.0;
+      if (da < 1000) return const SizedBox.shrink();
+      return Text(
+          '${sayi(da)} dekar çok büyük. m² yazdıysanız ${sayi(da / 1000)} dekar olarak '
+          'kaydedilecek.',
+          style: const TextStyle(color: Renk.turuncu, fontWeight: FontWeight.w700));
+    },
+    // m² yazıldıysa (1000 ve üstü) dekara çevrilir.
+    onKaydet: (d) async {
+      final da = d['dekar'] is num ? (d['dekar'] as num).toDouble() : 0.0;
+      if (da >= 1000) d['dekar'] = da / 1000;
+      await durum.kaydet('tarlalar', d, id: tarla?.id);
+    },
     onSil: tarla == null ? null : () => durum.sil('tarlalar', tarla.id),
   );
 }
@@ -301,6 +315,13 @@ Future<void> ekimFormu(BuildContext context, Durum durum,
     },
     onKaydet: (d) async {
       if (d.remove('farkliAlan') != true) d['dekar'] = null;
+      // m² yazıldıysa dekara çevir.
+      final ekDa = d['dekar'] is num ? (d['dekar'] as num).toDouble() : 0.0;
+      if (ekDa >= 1000) {
+        d['dekar'] = ekDa / 1000;
+        final df = d['kiraDekar'] is num ? (d['kiraDekar'] as num).toDouble() : 0.0;
+        if (df > 0) d['kira'] = double.parse((df * ekDa / 1000).toStringAsFixed(2));
+      }
       if (d['sahip'] == baskasi) {
         d['ortaklar'] = null;
       } else {

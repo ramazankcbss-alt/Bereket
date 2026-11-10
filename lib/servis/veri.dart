@@ -354,9 +354,48 @@ class Durum extends ChangeNotifier {
     _kk.forEach((ad, l) => hepsi[ad] = [...?hepsi[ad], ...l]);
     _v = Veriler(isletme: isletme, koleksiyonlar: hepsi);
     notifyListeners();
+    if (yonetici && yuklendi && isletme?.ayarlar['alanM2Duzeltme'] != true && !_alanDuzeltiliyor) {
+      _alanDuzeltiliyor = true;
+      _alanlariDuzelt();
+    }
     if (uye && !sinirli && yuklendi && (isletme?.aile.isNotEmpty ?? false)) {
       _ozetZamanlayici?.cancel();
       _ozetZamanlayici = Timer(const Duration(seconds: 3), _aileOzetleriniYaz);
+    }
+  }
+
+  bool _alanDuzeltiliyor = false;
+
+  /// Bir kerelik: ÇKS'deki m² değeri dekar diye girilmişti (40.000 "dekar" =
+  /// 40 dekar). 1000 ve üstü alanlar 1000'e bölünür; dekar fiyatından
+  /// hesaplanan kira bedelleri yeni alanla yeniden hesaplanır.
+  Future<void> _alanlariDuzelt() async {
+    try {
+      final yeniTarla = <String, double>{};
+      for (final t in _v.tarlalar) {
+        final d = t.n('dekar');
+        if (d >= 1000) {
+          yeniTarla[t.id] = d / 1000;
+          await Veri.kaydet(iid, 'tarlalar', {'dekar': d / 1000}, id: t.id);
+        }
+      }
+      for (final e in _v.ekimler) {
+        final g = <String, dynamic>{};
+        var alan = e.n('dekar');
+        if (alan >= 1000) {
+          alan = alan / 1000;
+          g['dekar'] = alan;
+        }
+        if (alan <= 0) alan = yeniTarla[e.s('tarlaId')] ?? (_v.tarla(e.s('tarlaId'))?.n('dekar') ?? 0);
+        if (e.n('kiraDekar') > 0 && alan > 0 && (g.isNotEmpty || yeniTarla.containsKey(e.s('tarlaId')))) {
+          g['kira'] = double.parse((e.n('kiraDekar') * alan).toStringAsFixed(2));
+        }
+        if (g.isNotEmpty) await Veri.kaydet(iid, 'ekimler', g, id: e.id);
+      }
+      await Veri.ayarYaz(iid, 'alanM2Duzeltme', true);
+    } catch (e) {
+      debugPrint('Alan düzeltmesi yapılamadı: $e');
+      _alanDuzeltiliyor = false;
     }
   }
 
