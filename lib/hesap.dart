@@ -497,14 +497,20 @@ class Veriler {
   }
 
   /// Destek bu tarlada kime ait: alan bazlı destekler (mazot-gübre...)
-  /// arazi ailenin kendi mülküyse arazi sahibine (ÇKS sahibi ya da tarlada
-  /// seçilen), diğerleri o yıl ekene.
+  /// arazi ailenin kendi mülküyse arazi sahibine (o yılın ekiminde seçilen,
+  /// eski kayıtlarda tarlada seçilen, yoksa ÇKS sahibi), diğerleri o yıl ekene.
   Map<String, double> destekHakPaylari(Kayit g, String tarlaId) {
     final t = tarla(tarlaId);
     final eken = tarlaYilPaylari(tarlaId, g.yil);
     if (t == null || !alanBazliDestekler.contains(g.s('destekTuru'))) return eken;
     final m = t.s('mulkiyet');
     if (m.isNotEmpty && m != 'Kendi') return eken;
+    final ekimde = ekimler
+        .where((e) =>
+            e.s('tarlaId') == tarlaId && e.t('yil') == g.yil && e.s('destekSahibi').isNotEmpty)
+        .map((e) => e.s('destekSahibi'))
+        .toList();
+    if (ekimde.isNotEmpty) return {ekimde.first: 1};
     final secilen = t.s('destekSahibi');
     if (secilen.isNotEmpty) return {secilen: 1};
     final cks = t.s('cks');

@@ -14,6 +14,7 @@ class Alan {
     this.etiket, {
     this.tip = AlanTip.metin,
     this.secenekler = const [],
+    this.seceneklerFn,
     this.oneriler = const [],
     this.zorunlu = false,
     this.ipucu,
@@ -26,6 +27,9 @@ class Alan {
   final String etiket;
   final AlanTip tip;
   final List<String> secenekler;
+
+  /// Seçenekler başka alanlara bağlıysa (il → ilçe → mahalle).
+  final List<String> Function(Map<String, dynamic> d)? seceneklerFn;
 
   /// Metin alanının altında dokununca yazılan hazır seçenekler.
   final List<String> oneriler;
@@ -247,9 +251,10 @@ class _FormSayfasiState extends State<FormSayfasi> {
         );
       case AlanTip.secim:
         final sS = (_d[a.key] ?? '').toString();
+        final secenekler = a.seceneklerFn?.call(_d) ?? a.secenekler;
         final lS = [
-          ...a.secenekler,
-          if (sS.isNotEmpty && !a.secenekler.contains(sS)) sS,
+          ...secenekler,
+          if (sS.isNotEmpty && !secenekler.contains(sS)) sS,
         ];
         return DropdownButtonFormField<String>(
           // Değer başka bir alana göre değişirse (degisince) kutu da yenilensin.

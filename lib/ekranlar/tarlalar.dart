@@ -4,6 +4,7 @@ import '../bicim.dart';
 import '../hesap.dart';
 import '../modeller.dart';
 import '../sabitler.dart';
+import '../servis/idari.dart';
 import '../servis/veri.dart';
 import '../tema.dart';
 import 'form.dart';
@@ -39,28 +40,34 @@ void ortakTopla(Map<String, dynamic> d) {
   d['ortaklar'] = m;
 }
 
-/// Tarla ekle / düzenle.
-Future<void> tarlaFormu(BuildContext context, Durum durum, {Kayit? tarla}) {
+/// Tarla ekle / düzenle. Burada yalnızca arazi bilgisi girilir; kimin
+/// ektiği, ortaklık ve destek sahibi her yılın ekiminde (Üretim Merkezi) sorulur.
+Future<void> tarlaFormu(BuildContext context, Durum durum, {Kayit? tarla}) async {
+  await Idari.yukle();
+  if (!context.mounted) return;
   final v = durum.v;
   final sahipler = v.sahipler();
   final bas = <String, dynamic>{
     'cks': 'Babam',
     'mulkiyet': 'Kendi',
-    'sahip': Veriler.ben,
-    'gelirSahibi': Veriler.ben,
+    'il': 'Konya',
     'ilce': 'Karapınar',
+    'gelirSahibi': Veriler.ben,
     ...?tarla?.d,
   };
-  if (tarla != null) ortakDoldur(bas, tarla.m('ortaklar'));
+  if ((bas['il'] ?? '').toString().isEmpty) bas['il'] = 'Konya';
+  bas['kirayaVerildi'] = bas['sahip'] == baskasi;
   bool kiralik(Map<String, dynamic> d) =>
       (d['mulkiyet'] ?? '').toString() != 'Kendi' &&
       (d['mulkiyet'] ?? '').toString() != 'Ortak';
-  bool baskasiEkiyor(Map<String, dynamic> d) => d['sahip'] == baskasi;
+  bool verildi(Map<String, dynamic> d) => d['kirayaVerildi'] == true;
+  String s(Map<String, dynamic> d, String k) => (d[k] ?? '').toString();
   final kiraVerenler = <String>{
     'Milli Emlak',
     for (final t in v.tarlalar)
       if (t.s('kiraVeren').isNotEmpty) t.s('kiraVeren'),
   }.toList();
+  final liste = Idari.hazir;
   return formAc(
     context,
     baslik: tarla == null ? 'Yeni Tarla' : 'Tarlayı Düzenle',
@@ -68,11 +75,20 @@ Future<void> tarlaFormu(BuildContext context, Durum durum, {Kayit? tarla}) {
     baslangic: bas,
     alanlar: [
       const Alan('ad', 'Tarla adı / mevki', ipucu: 'Örn. Kuyu başı', zorunlu: true),
-      const Alan('ilce', 'İlçe', oneriler: ['Karapınar', 'Ereğli', 'Çumra', 'Karatay']),
-      const Alan('mahalle', 'Mahalle / köy', oneriler: ['Hotamış']),
+      if (liste) ...[
+        Alan('il', 'İl', tip: AlanTip.secim, seceneklerFn: (_) => Idari.iller()),
+        Alan('ilce', 'İlçe', tip: AlanTip.secim,
+            seceneklerFn: (d) => Idari.ilceler(s(d, 'il'))),
+        Alan('mahalle', 'Mahalle / köy', tip: AlanTip.secim,
+            seceneklerFn: (d) => Idari.mahalleler(s(d, 'il'), s(d, 'ilce'))),
+      ] else ...[
+        const Alan('il', 'İl'),
+        const Alan('ilce', 'İlçe'),
+        const Alan('mahalle', 'Mahalle / köy'),
+      ],
       const Alan('ada', 'Ada'),
       const Alan('parsel', 'Parsel'),
-      const Alan('dekar', 'Alan', tip: AlanTip.sayi, birim: 'dekar', zorunlu: true),
+      const Alan('dekar', 'Alan (ÇKS)', tip: AlanTip.sayi, birim: 'dekar', zorunlu: true),
       Alan('cks', 'ÇKS kimin üzerine', tip: AlanTip.secim,
           secenekler: [...sahipler, cksBizdeDegil]),
       const Alan('mulkiyet', 'Arazinin durumu', tip: AlanTip.secim, secenekler: mulkiyetler),
@@ -80,26 +96,32 @@ Future<void> tarlaFormu(BuildContext context, Durum durum, {Kayit? tarla}) {
           tip: AlanTip.sayi, birim: '₺', gorunur: kiralik,
           aciklama: 'Her yıl bu tarlanın maliyetine eklenir.'),
       Alan('kiraVeren', 'Kime ödeniyor', gorunur: kiralik, oneriler: kiraVerenler),
-      Alan('sahip', 'Kim ekiyor', tip: AlanTip.secim,
-          secenekler: [...sahipler, baskasi],
-          aciklama: 'Maliyet, satış ve kâr bu kişinin hesabına yazılır.'),
-      ...ortakAlanlari(sahipler, gorunur: (d) => !baskasiEkiyor(d)),
-      Alan('kiraci', 'Eken kişinin adı', gorunur: baskasiEkiyor),
+      const Alan('kirayaVerildi', 'Başkasına kiraya verildi', tip: AlanTip.anahtar,
+          ipucu: 'Tarlayı başkası ekiyor, biz kira alıyoruz.'),
+      Alan('kiraci', 'Kiracının adı', gorunur: verildi),
       Alan('kiraGeliri', 'Aldığımız yıllık kira', tip: AlanTip.sayi, birim: '₺',
-          gorunur: baskasiEkiyor),
+          gorunur: verildi),
       Alan('gelirSahibi', 'Kira geliri kimin', tip: AlanTip.secim,
-          secenekler: sahipler, gorunur: baskasiEkiyor),
-      Alan('destekSahibi', 'Mazot-gübre desteği kimin', tip: AlanTip.secim,
-          secenekler: ['', ...sahipler],
-          gorunur: (d) => !kiralik(d),
-          aciklama: 'Boşsa ÇKS sahibine yazılır. Ürün desteği her zaman ekene yazılır.'),
+          secenekler: sahipler, gorunur: verildi),
       const Alan('not', 'Not', tip: AlanTip.uzun),
     ],
+    degisince: (key, d) {
+      // Üst seçim değişince alttakiler boşalır (il → ilçe → mahalle).
+      if (key == 'il') {
+        d['ilce'] = '';
+        d['mahalle'] = '';
+      } else if (key == 'ilce') {
+        d['mahalle'] = '';
+      }
+    },
     // Ürünler burada girilmez: her yılın ürünü ekim kayıtlarından gelir.
-    // Eski sürümde girilmiş 'gecmis' bilgisi olduğu gibi korunur.
+    // Eski sürümde girilmiş 'gecmis', 'sahip', 'ortaklar' bilgisi korunur.
     onKaydet: (d) async {
-      ortakTopla(d);
-      if (d['sahip'] != baskasi) {
+      final kiraya = d.remove('kirayaVerildi') == true;
+      if (kiraya) {
+        d['sahip'] = baskasi;
+      } else {
+        if (d['sahip'] == baskasi) d['sahip'] = '';
         d['kiraci'] = null;
         d['kiraGeliri'] = null;
       }
@@ -125,9 +147,10 @@ Future<void> ekimFormu(BuildContext context, Durum durum,
     'durum': sezon > buYil ? ekimPlanlaniyor : 'Ekildi',
     'tarlaId': tarlaId ?? '',
     if (urun != null) 'urun': urun,
-    'sahip': '',
+    'sahip': tarlaId == null ? '' : v.tarlaSahibi(tarlaId),
     ...?ekim?.d,
   };
+  if (bas['sahip'] == baskasi) bas['sahip'] = Veriler.ben;
   bas['farkliAlan'] = (ekim?.n('dekar') ?? 0) > 0;
   if (ekim != null) ortakDoldur(bas, ekim.m('ortaklar'));
   int yilOf(Map<String, dynamic> d) =>
@@ -155,10 +178,17 @@ Future<void> ekimFormu(BuildContext context, Durum durum,
           aciklama: 'Giderler aynı tarladaki ekimlere bu alanlara göre bölünür.'),
       Alan('urun', 'Ürün', tip: AlanTip.secim,
           secenekler: [for (final u in urunler) u.ad], zorunlu: true),
-      Alan('sahip', 'Bu yıl kim ekiyor', tip: AlanTip.secim,
-          secenekler: ['', ...v.sahipler()],
-          aciklama: 'Boş bırakırsanız tarlada seçili kişi geçerli olur.'),
+      Alan('sahip', 'Kim ekiyor', tip: AlanTip.secim,
+          secenekler: v.sahipler(),
+          aciklama: 'Maliyet, satış ve kâr bu kişinin hesabına yazılır.'),
       ...ortakAlanlari(v.sahipler()),
+      Alan('destekSahibi', 'Mazot-gübre desteği kimin', tip: AlanTip.secim,
+          secenekler: ['', ...v.sahipler()],
+          gorunur: (d) {
+            final m = v.tarla((d['tarlaId'] ?? '').toString())?.s('mulkiyet') ?? '';
+            return m.isEmpty || m == 'Kendi';
+          },
+          aciklama: 'Boşsa ÇKS sahibine yazılır. Ürün desteği her zaman ekene yazılır.'),
       const Alan('durum', 'Durum', tip: AlanTip.secim, secenekler: ekimDurumlari),
       Alan('ekimTarihi', 'Ekim tarihi', tip: AlanTip.tarih,
           gorunur: (d) => d['durum'] != ekimPlanlaniyor),
@@ -202,6 +232,11 @@ Future<void> ekimFormu(BuildContext context, Durum durum,
     },
     degisince: (key, d) {
       // Farklı alan seçilince kalan alanı öner (tarla ikiye bölünüyorsa).
+      if (key == 'tarlaId') {
+        final id = (d['tarlaId'] ?? '').toString();
+        final s = v.tarlaSahibi(id);
+        if (id.isNotEmpty && ekim == null) d['sahip'] = s == baskasi ? Veriler.ben : s;
+      }
       if (key == 'farkliAlan' || key == 'tarlaId' || key == 'yil') {
         final t = v.tarla((d['tarlaId'] ?? '').toString());
         final dk = d['dekar'];
@@ -344,7 +379,6 @@ class TarlalarSayfasi extends StatefulWidget {
 class _TarlalarSayfasiState extends State<TarlalarSayfasi> {
   String _filtre = 'Hepsi';
   String _ara = '';
-  final Set<String> _secili = {};
 
   Durum get durum => widget.durum;
 
@@ -364,24 +398,6 @@ class _TarlalarSayfasiState extends State<TarlalarSayfasi> {
         return t.s('cks') == cksBizdeDegil;
       default:
         return s == _filtre;
-    }
-  }
-
-  Future<void> _topluAta() async {
-    final v = durum.v;
-    final kim = await secimYap(context, '${_secili.length} parseli kim ekiyor?',
-        [...v.sahipler(), baskasi]);
-    if (kim == null) return;
-    try {
-      for (final id in _secili) {
-        await durum.kaydet('tarlalar', {'sahip': kim}, id: id);
-      }
-      if (mounted) {
-        bildir(context, '${_secili.length} parsel "$kim" olarak işaretlendi.');
-        setState(_secili.clear);
-      }
-    } catch (e) {
-      if (mounted) bildir(context, hataYazisi(e));
     }
   }
 
@@ -425,23 +441,10 @@ class _TarlalarSayfasiState extends State<TarlalarSayfasi> {
 
   @override
   Widget build(BuildContext context) {
-    final secimModu = _secili.isNotEmpty;
     return Sayfa(
-      baslik: secimModu ? '${_secili.length} seçili' : 'Tarlalarım',
+      baslik: 'Tarlalarım',
       durum: durum,
-      eylemler: [
-        if (secimModu) ...[
-          TextButton.icon(
-            onPressed: _topluAta,
-            icon: const Icon(Icons.person_pin_circle_outlined),
-            label: const Text('Kim ekiyor?'),
-          ),
-          IconButton(
-              onPressed: () => setState(_secili.clear),
-              icon: const Icon(Icons.close)),
-        ],
-      ],
-      fab: secimModu ? null : ekleButonu('Tarla Ekle', () => tarlaFormu(context, durum)),
+      fab: ekleButonu('Tarla Ekle', () => tarlaFormu(context, durum)),
       builder: (context, v) {
         final yil = DateTime.now().year;
         final ekiliIds = {
@@ -531,15 +534,6 @@ class _TarlalarSayfasiState extends State<TarlalarSayfasi> {
           else if (liste.isEmpty)
             const BosDurum(simge: '🔎', yazi: 'Bu filtrede tarla yok.'),
           for (final t in liste) _tarlaKarti(context, v, t, yil),
-          if (v.tarlalar.isNotEmpty && !secimModu)
-            const Padding(
-              padding: EdgeInsets.only(top: 6),
-              child: Text(
-                'İpucu: Bir karta uzun basıp birden çok parsel seçerek "kim ekiyor" bilgisini toplu değiştirebilirsiniz.',
-                textAlign: TextAlign.center,
-                style: yaziSoluk,
-              ),
-            ),
         ];
       },
     );
@@ -559,29 +553,19 @@ class _TarlalarSayfasiState extends State<TarlalarSayfasi> {
         ? buYilUrun
         : buYilEkim.map(urunYazi).join(', ');
     final sahip = v.tarlaSahibi(t.id);
-    final secili = _secili.contains(t.id);
+    final paylar = sahip == baskasi ? {baskasi: 1.0} : v.tarlaYilPaylari(t.id, yil);
+    final eken = paylar.length == 1 ? paylar.keys.first : null;
     final m = buYilUrun == null ? null : v.munavebe(t, buYilUrun, yil);
     final ekimler = v.tarlaEkimleri(t.id);
     final kira = t.n('kira');
-    return GestureDetector(
-      onLongPress: () => setState(() => _secili.add(t.id)),
-      child: Panel(
-        kenarRengi: secili ? Renk.altin : null,
-        onTap: _secili.isNotEmpty
-            ? () => setState(() => secili ? _secili.remove(t.id) : _secili.add(t.id))
-            : () => tarlaFormu(context, durum, tarla: t),
+    return Panel(
+        onTap: () => tarlaFormu(context, durum, tarla: t),
         padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
-                if (_secili.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: Icon(secili ? Icons.check_circle : Icons.circle_outlined,
-                        color: secili ? Renk.altin : Renk.soluk),
-                  ),
                 Expanded(
                   child: Text(v.tarlaAdi(t.id),
                       style: const TextStyle(
@@ -639,10 +623,10 @@ class _TarlalarSayfasiState extends State<TarlalarSayfasi> {
                 Etiket(
                     sahip == baskasi
                         ? 'Eken: ${t.s('kiraci').isEmpty ? baskasi : t.s('kiraci')}'
-                        : (v.tarlaPaylari(t.id).length > 1
-                            ? 'Ortak: ${v.tarlaPaylari(t.id).entries.map((e) => '${e.key} %${(e.value * 100).round()}').join(', ')}'
-                            : 'Eken: $sahip'),
-                    renk: sahip == Veriler.ben ? Renk.yesilKoyu : Renk.maviKoyu),
+                        : (eken == null
+                            ? 'Ortak: ${paylar.entries.map((e) => '${e.key} %${(e.value * 100).round()}').join(', ')}'
+                            : 'Eken: $eken'),
+                    renk: eken == Veriler.ben ? Renk.yesilKoyu : Renk.maviKoyu),
                 if (sahip == baskasi && t.n('kiraGeliri') > 0)
                   Etiket('Kira geliri ${tl0(t.n('kiraGeliri'))}', renk: Renk.turkuaz),
               ],
@@ -701,7 +685,6 @@ class _TarlalarSayfasiState extends State<TarlalarSayfasi> {
             ),
           ],
         ),
-      ),
     );
   }
 }
