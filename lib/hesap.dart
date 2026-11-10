@@ -176,13 +176,14 @@ class Veriler {
   }
 
   /// Bir tarlanın belli bir yıldaki payları (o yıl ekimi varsa ekimden;
-  /// aynı yıl iki ekim varsa eşit bölünür).
+  /// aynı yıl birden çok ekim varsa ekilen alanlarına göre bölünür).
   Map<String, double> tarlaYilPaylari(String tarlaId, int yil) {
     final l = ekimler.where((e) => e.s('tarlaId') == tarlaId && e.t('yil') == yil).toList();
     if (l.isEmpty) return tarlaPaylari(tarlaId);
     final out = <String, double>{};
     for (final e in l) {
-      ekimPaylari(e).forEach((k, v) => out[k] = (out[k] ?? 0) + v / l.length);
+      final o = ekimOrani(e);
+      ekimPaylari(e).forEach((k, v) => out[k] = (out[k] ?? 0) + v * o);
     }
     return out;
   }
@@ -278,6 +279,23 @@ class Veriler {
 
   /// Tarlanın yıllara göre ürün geçmişi: ÇKS'den/elle girilen geçmiş +
   /// uygulamadaki ekimler (aynı yılda ekim varsa o geçerlidir).
+  /// Ekimin alanı: ekimde ayrıca girilmişse o (tarla bölünerek ekildiyse),
+  /// yoksa tarlanın ÇKS'deki alanı.
+  double ekimDekar(Kayit e) {
+    final d = e.n('dekar');
+    return d > 0 ? d : (tarla(e.s('tarlaId'))?.n('dekar') ?? 0);
+  }
+
+  /// Ekimin, tarlanın o yılki giderlerinden aldığı pay (0..1): aynı tarlada
+  /// aynı yıl birden çok ekim varsa ekilen alanlara göre bölünür.
+  double ekimOrani(Kayit e) {
+    final ayni = ekimler.where(
+        (x) => x.s('tarlaId') == e.s('tarlaId') && x.t('yil') == e.t('yil'));
+    final top = ayni.fold(0.0, (a, x) => a + ekimDekar(x));
+    if (top <= 0) return 1 / (ayni.isEmpty ? 1 : ayni.length);
+    return ekimDekar(e) / top;
+  }
+
   /// Ekim gerçekten yapıldı mı (yalnızca planlanmış değil).
   static bool ekili(Kayit e) => e.s('durum') != ekimPlanlaniyor;
 
@@ -357,17 +375,15 @@ class Veriler {
     final tarlaId = ekim.s('tarlaId');
     final yil = ekim.t('yil');
     final t = tarla(tarlaId);
-    final ayniYil = ekimler
-        .where((e) => e.s('tarlaId') == tarlaId && e.t('yil') == yil)
-        .length;
-    final bolen = ayniYil < 1 ? 1 : ayniYil;
+    final eo = ekimOrani(ekim);
+    final ed = ekimDekar(ekim);
     final kalemler = <String, KalemToplam>{};
     var kiraGiderVar = false;
     for (final g in giderler) {
       if (g.s('alan') == 'ev' || g.yil != yil) continue;
       final pay = giderPaylari(g)[tarlaId] ?? 0;
       if (pay <= 0) continue;
-      final oran = pay / bolen;
+      final oran = pay * eo;
       final kalem = g.s('kalem').isEmpty ? 'Diğer' : g.s('kalem');
       if (kalem == 'Arazi Kirası' || kalem == 'Ecrimisil') kiraGiderVar = true;
       final k = kalemler.putIfAbsent(kalem, () => KalemToplam(g.s('birim')));
@@ -387,9 +403,9 @@ class Veriler {
             e.s('urun') == 'Şeker Pancarı' &&
             (ekimPaylari(e)[kul] ?? 0) > 0);
         final top = pancarlar.fold(0.0,
-            (a, e) => a + (tarla(e.s('tarlaId'))?.n('dekar') ?? 0) * (ekimPaylari(e)[kul] ?? 0));
+            (a, e) => a + ekimDekar(e) * (ekimPaylari(e)[kul] ?? 0));
         if (top <= 0) continue;
-        final buDekar = (t?.n('dekar') ?? 0) * p;
+        final buDekar = ed * p;
         final kk = kalemler.putIfAbsent('Kota Kirası', () => KalemToplam('ton'));
         kk.tutar += k.n('kiraBedeli') * buDekar / top;
         kk.miktar += k.n('ton') * buDekar / top;
@@ -399,8 +415,8 @@ class Veriler {
     if (t != null && !kiraGiderVar && t.n('kira') > 0) {
       final k = kalemler.putIfAbsent(
           kiraKalemi(t.s('mulkiyet')), () => KalemToplam('dekar'));
-      k.tutar += t.n('kira') / bolen;
-      k.miktar += t.n('dekar') / bolen;
+      k.tutar += t.n('kira') * eo;
+      k.miktar += ed;
     }
     var destek = 0.0;
     final ortaklar = ekimPaylari(ekim).keys.toSet();
@@ -411,7 +427,7 @@ class Veriler {
       hak.forEach((k, v) {
         if (ortaklar.contains(k)) oran += v;
       });
-      destek += (destekTarlaPaylari(g)[tarlaId] ?? 0) * oran / bolen;
+      destek += (destekTarlaPaylari(g)[tarlaId] ?? 0) * oran * eo;
     }
     var satisNet = 0.0, satisKg = 0.0;
     for (final s in satislar) {
@@ -423,7 +439,7 @@ class Veriler {
     }
     return EkimOzet(
       ekim: ekim,
-      dekar: (t?.n('dekar') ?? 0) / bolen,
+      dekar: ed,
       kalemler: kalemler,
       hasatKg: ekim.n('hasatKg'),
       satisNet: satisNet,
@@ -699,9 +715,7 @@ class Veriler {
     }
     o.kiraGeliri = kiraGeliri(sahip);
     o.ekiliDekar = ekimler.where((e) => e.t('yil') == yil && ekili(e)).fold(
-        0.0,
-        (a, e) =>
-            a + (tarla(e.s('tarlaId'))?.n('dekar') ?? 0) * (ekimPaylari(e)[sahip] ?? 0));
+        0.0, (a, e) => a + ekimDekar(e) * (ekimPaylari(e)[sahip] ?? 0));
     // Kiralanan pancar kotası bedeli.
     for (final k in kotalar) {
       if (k.t('yil') == yil && kotaKullanan(k) == sahip) o.tarimGider += k.n('kiraBedeli');
@@ -891,7 +905,7 @@ class Veriler {
     miktar.forEach((yil, m) {
       final dekar = ekimler
           .where((e) => e.t('yil') == yil)
-          .fold(0.0, (a, e) => a + (tarla(e.s('tarlaId'))?.n('dekar') ?? 0));
+          .fold(0.0, (a, e) => a + ekimDekar(e));
       if (dekar > 0) out[yil] = m / dekar;
     });
     return out;
@@ -902,7 +916,7 @@ class Veriler {
     final kg = <int, double>{}, da = <int, double>{};
     for (final e in ekimler) {
       if (e.s('urun') != urun || e.n('hasatKg') <= 0) continue;
-      final d = tarla(e.s('tarlaId'))?.n('dekar') ?? 0;
+      final d = ekimDekar(e);
       if (d <= 0) continue;
       kg[e.t('yil')] = (kg[e.t('yil')] ?? 0) + e.n('hasatKg');
       da[e.t('yil')] = (da[e.t('yil')] ?? 0) + d;

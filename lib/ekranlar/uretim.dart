@@ -356,7 +356,7 @@ class _UretimSayfasiState extends State<UretimSayfasi> {
                         child: Buton(
                             yazi: 'Yeni Ekim',
                             renk: ButonRenk.yesil,
-                            onTap: () => ekimFormu(context, durum))),
+                            onTap: () => ekimFormu(context, durum, yil: _yil))),
                     const SizedBox(width: 10),
                     Expanded(
                         child: Buton(
@@ -420,7 +420,7 @@ class _UretimSayfasiState extends State<UretimSayfasi> {
                 simge: '🌱',
                 yazi: '$_yil için ekim yok. Ekimi girin, giderler tarlaya göre kendiliğinden dağıtılır.',
                 butonYazi: 'Ekim Gir',
-                onTap: () => ekimFormu(context, durum),
+                onTap: () => ekimFormu(context, durum, yil: _yil),
               ),
             for (final o in ekimler) _ekimKarti(context, v, o),
           ],

@@ -128,7 +128,17 @@ Future<void> ekimFormu(BuildContext context, Durum durum,
     'sahip': '',
     ...?ekim?.d,
   };
+  bas['farkliAlan'] = (ekim?.n('dekar') ?? 0) > 0;
   if (ekim != null) ortakDoldur(bas, ekim.m('ortaklar'));
+  int yilOf(Map<String, dynamic> d) =>
+      d['yil'] is num ? (d['yil'] as num).toInt() : buYil;
+  // Aynı tarlada aynı yıl girilmiş diğer ekimlerin alanı (bu ekim hariç).
+  double digerleri(Map<String, dynamic> d) => v.ekimler
+      .where((e) =>
+          e.id != ekim?.id &&
+          e.s('tarlaId') == (d['tarlaId'] ?? '').toString() &&
+          e.t('yil') == yilOf(d))
+      .fold(0.0, (a, e) => a + v.ekimDekar(e));
   return formAc(
     context,
     baslik: ekim == null ? 'Ekim / Hasat' : 'Ekimi Düzenle',
@@ -137,6 +147,12 @@ Future<void> ekimFormu(BuildContext context, Durum durum,
     alanlar: [
       const Alan('tarlaId', 'Tarla', tip: AlanTip.tarla, zorunlu: true),
       const Alan('yil', 'Sezon (yıl)', tip: AlanTip.yil),
+      Alan('farkliAlan', 'Ekilen alan ÇKS alanından farklı', tip: AlanTip.anahtar,
+          ipucu: 'Tarlanın bir kısmı ekildiyse ya da tarla iki ürüne bölündüyse açın. '
+              'Kapalıysa tarlanın ÇKS alanının tamamı sayılır.'),
+      Alan('dekar', 'Ekilen alan', tip: AlanTip.sayi, birim: 'dekar', zorunlu: true,
+          gorunur: (d) => d['farkliAlan'] == true,
+          aciklama: 'Giderler aynı tarladaki ekimlere bu alanlara göre bölünür.'),
       Alan('urun', 'Ürün', tip: AlanTip.secim,
           secenekler: [for (final u in urunler) u.ad], zorunlu: true),
       Alan('sahip', 'Bu yıl kim ekiyor', tip: AlanTip.secim,
@@ -156,15 +172,44 @@ Future<void> ekimFormu(BuildContext context, Durum durum,
     ozet: (d) {
       final t = v.tarla((d['tarlaId'] ?? '').toString());
       final u = (d['urun'] ?? '').toString();
-      final y = d['yil'] is num ? (d['yil'] as num).toInt() : DateTime.now().year;
-      if (t == null || u.isEmpty) {
+      final y = yilOf(d);
+      if (t == null) {
         return const Text('Tarla ve ürün seçince münavebe kontrol edilir.',
             style: yaziSoluk);
       }
-      final m = v.munavebe(t, u, y);
-      return MunavebeSatiri(m);
+      final cks = t.n('dekar');
+      final bu = d['farkliAlan'] == true
+          ? (d['dekar'] is num ? (d['dekar'] as num).toDouble() : 0.0)
+          : cks;
+      final diger = digerleri(d);
+      final asim = bu + diger > cks + 0.001;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+              'ÇKS alanı ${sayi(cks)} da · bu ekim ${sayi(bu)} da'
+              '${diger > 0 ? ' · aynı yıl diğer ekimler ${sayi(diger)} da' : ''}',
+              style: TextStyle(color: asim ? Renk.turuncu : Renk.soluk)),
+          if (asim)
+            const Text('Ekimlerin toplamı ÇKS alanını aşıyor.',
+                style: TextStyle(color: Renk.turuncu)),
+          if (u.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            MunavebeSatiri(v.munavebe(t, u, y)),
+          ],
+        ],
+      );
     },
     degisince: (key, d) {
+      // Farklı alan seçilince kalan alanı öner (tarla ikiye bölünüyorsa).
+      if (key == 'farkliAlan' || key == 'tarlaId' || key == 'yil') {
+        final t = v.tarla((d['tarlaId'] ?? '').toString());
+        final dk = d['dekar'];
+        if (d['farkliAlan'] == true && t != null && (dk is! num || dk <= 0)) {
+          final kalan = t.n('dekar') - digerleri(d);
+          if (kalan > 0) d['dekar'] = kalan;
+        }
+      }
       if (key != 'yil') return;
       final y = d['yil'] is num ? (d['yil'] as num).toInt() : buYil;
       if (y > buYil) {
@@ -174,6 +219,7 @@ Future<void> ekimFormu(BuildContext context, Durum durum,
       }
     },
     onKaydet: (d) async {
+      if (d.remove('farkliAlan') != true) d['dekar'] = null;
       if (d['durum'] == ekimPlanlaniyor) d['ekimTarihi'] = null;
       if (d['durum'] != 'Hasat edildi') {
         d['hasatKg'] = null;
@@ -506,6 +552,12 @@ class _TarlalarSayfasiState extends State<TarlalarSayfasi> {
     final buYilPlanli = buYilEkim.isNotEmpty && buYilEkim.every((e) => !Veriler.ekili(e));
     final buYilUrun = gecmis[yil];
     final planlar = v.planliEkimler(t.id, yil + 1);
+    // Tarla bölünerek ekildiyse ürünün yanında alanı da yazılır.
+    String urunYazi(Kayit e) =>
+        e.n('dekar') > 0 ? '${e.s('urun')} ${sayi(e.n('dekar'))} da' : e.s('urun');
+    final buYilYazi = buYilEkim.isEmpty
+        ? buYilUrun
+        : buYilEkim.map(urunYazi).join(', ');
     final sahip = v.tarlaSahibi(t.id);
     final secili = _secili.contains(t.id);
     final m = buYilUrun == null ? null : v.munavebe(t, buYilUrun, yil);
@@ -569,10 +621,10 @@ class _TarlalarSayfasiState extends State<TarlalarSayfasi> {
                       Satir('$yil',
                           buYilUrun == null
                               ? 'Ekilmedi'
-                              : (buYilPlanli ? '$buYilUrun (planlanıyor)' : buYilUrun),
+                              : (buYilPlanli ? '$buYilYazi (planlanıyor)' : buYilYazi!),
                           renk: buYilUrun == null ? Renk.soluk : Renk.altin),
                       for (final p in planlar)
-                        Satir('${p.t('yil')} planı', p.s('urun'), renk: Renk.turkuaz),
+                        Satir('${p.t('yil')} planı', urunYazi(p), renk: Renk.turkuaz),
                     ],
                   ),
                 ),

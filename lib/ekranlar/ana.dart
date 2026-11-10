@@ -176,7 +176,7 @@ class AnaSayfa extends StatelessWidget {
     final i = durum.isletme!;
     final yil = DateTime.now().year;
     final buYil = v.ekimler.where((e) => e.t('yil') == yil).toList();
-    double dekar(Kayit e) => v.tarla(e.s('tarlaId'))?.n('dekar') ?? 0;
+    double dekar(Kayit e) => v.ekimDekar(e);
     final ekili = buYil.fold(0.0, (a, e) => a + dekar(e));
     final hasat = buYil
         .where((e) => e.s('durum') == 'Hasat edildi')
