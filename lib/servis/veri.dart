@@ -44,6 +44,7 @@ class Veri {
   static const koleksiyonlar = [
     'tarlalar', 'ekimler', 'giderler', 'sayaclar', 'satislar', 'hesaplar',
     'gelirler', 'isyerleri', 'varliklar', 'fiyatlar', 'isler', 'kotalar', 'ekipmanlar', 'aile_hareketler',
+    'stoklar',
   ];
 
   static CollectionReference<Map<String, dynamic>> kol(String iid, String ad) =>
@@ -388,7 +389,9 @@ class Durum extends ChangeNotifier {
       }, onError: (Object e) {
         debugPrint('$ad okunamadı: $e');
         _yuklenen.add(ad);
-        hata ??= e;
+        // Ortak stok yeni: kurallar yayınlanmadıysa okunamaz; diğer ekranları
+        // uyarıyla bozmasın, yalnızca stok boş görünsün.
+        if (ad != 'stoklar') hata ??= e;
         _yenile();
       }));
     }

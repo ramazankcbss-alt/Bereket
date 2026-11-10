@@ -29,6 +29,21 @@ class Veriler {
   List<Kayit> get ekipmanlar => k['ekipmanlar'] ?? const [];
   List<Kayit> get aileHareketleri => k['aile_hareketler'] ?? const [];
 
+  /// Ortak stok (toplu alımlar). Kullanımlar 'stokId' taşıyan giderlerdir.
+  List<Kayit> get stoklar => k['stoklar'] ?? const [];
+
+  List<Kayit> stokKullanimlari(String stokId) =>
+      giderler.where((g) => g.s('stokId') == stokId).toList();
+
+  double stokKullanilan(String stokId, {String? haric}) => stokKullanimlari(stokId)
+      .where((g) => g.id != haric)
+      .fold(0.0, (a, g) => a + g.n('miktar'));
+
+  double stokKalan(String stokId, {String? haric}) =>
+      (bul('stoklar', stokId)?.n('miktar') ?? 0) - stokKullanilan(stokId, haric: haric);
+
+  String stokAdi(Kayit s) => s.s('aciklama').isNotEmpty ? s.s('aciklama') : s.s('kalem');
+
   double ekipmanDegeri(Kayit e) =>
       e.n('guncelDeger') > 0 ? e.n('guncelDeger') : e.n('alisFiyati');
 

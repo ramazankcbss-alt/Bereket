@@ -11,6 +11,7 @@ import 'belge_okut.dart';
 import 'form.dart';
 import 'kabuk.dart';
 import 'satislar.dart';
+import 'stok.dart';
 import 'tarlalar.dart';
 
 double _n(Object? v) => v is num ? v.toDouble() : 0;
@@ -21,6 +22,7 @@ Future<void> giderFormu(BuildContext context, Durum durum,
     bool ev = false,
     bool iscilik = false,
     String? tarlaId,
+    String? stokId,
     Map<String, dynamic>? hazir}) {
   final v = durum.v;
   final evMi = gider != null ? gider.s('alan') == 'ev' : ev;
@@ -32,6 +34,35 @@ Future<void> giderFormu(BuildContext context, Durum durum,
     ]
   }.toList();
   final sayacAdlari = {for (final s in v.sayaclar) s.s('ad'): s.id};
+  // Ortak stok: görünen ad → stok kimliği.
+  final stokAdlari = <String, String>{};
+  for (final s in v.stoklar) {
+    var ad = '${v.stokAdi(s)} (${s.t('yil')})';
+    var i = 2;
+    while (stokAdlari.containsKey(ad)) {
+      ad = '${v.stokAdi(s)} (${s.t('yil')}) $i';
+      i++;
+    }
+    stokAdlari[ad] = s.id;
+  }
+  String stokAdiBul(String id) =>
+      stokAdlari.entries.firstWhere((e) => e.value == id, orElse: () => const MapEntry('', '')).key;
+  Kayit? secilenStok(Map<String, dynamic> d) {
+    final id = stokAdlari[(d['stok'] ?? '').toString()];
+    return id == null ? null : v.bul('stoklar', id);
+  }
+  void stoktanDoldur(Map<String, dynamic> d) {
+    final s = secilenStok(d);
+    if (s == null) return;
+    d['kalem'] = s.s('kalem').isEmpty ? 'Diğer' : s.s('kalem');
+    d['aciklama'] = s.s('aciklama');
+    d['birim'] = s.s('birim');
+    d['birimFiyat'] = s.n('birimFiyat');
+    final m = _n(d['miktar']);
+    if (m > 0 && s.n('birimFiyat') > 0) {
+      d['tutar'] = double.parse((m * s.n('birimFiyat')).toStringAsFixed(2));
+    }
+  }
 
   if (evMi) {
     return formAc(
@@ -70,6 +101,12 @@ Future<void> giderFormu(BuildContext context, Durum durum,
     ...?gider?.d,
     ...?hazir,
   };
+  final sId = stokId ?? gider?.s('stokId') ?? '';
+  if (sId.isNotEmpty) {
+    bas['stok'] = stokAdiBul(sId);
+    if (gider == null) stoktanDoldur(bas);
+  }
+  bool stoktan(Map<String, dynamic> d) => secilenStok(d) != null;
   if (gider != null && gider.s('sayacId').isNotEmpty) {
     for (final e in sayacAdlari.entries) {
       if (e.value == gider.s('sayacId')) bas['sayac'] = e.key;
@@ -95,16 +132,24 @@ Future<void> giderFormu(BuildContext context, Durum durum,
 
   return formAc(
     context,
-    baslik: gider == null ? (iscilik ? 'İşçilik / Makine' : 'Tarla Gideri') : 'Gideri Düzenle',
+    baslik: gider == null
+        ? (sId.isNotEmpty ? 'Stoktan Kullanım' : (iscilik ? 'İşçilik / Makine' : 'Tarla Gideri'))
+        : 'Gideri Düzenle',
     v: v,
     baslangic: bas,
     alanlar: [
-      Alan('kalem', 'Gider kalemi', tip: AlanTip.secim,
-          secenekler: giderKalemleri.keys.toList()),
       Alan('tarlaIds', 'Hangi tarla / parsel için', tip: AlanTip.tarlalar,
           gorunur: (d) => !sayacli(d),
           aciklama: 'Birden fazla seçerseniz tutar ve miktar dekarlarına göre bölünür. '
               'Ziraat odası, bekçi gibi ücretler için "Hepsini seç".'),
+      if (stokAdlari.isNotEmpty)
+        Alan('stok', 'Ortak stoktan (toplu alım)', tip: AlanTip.secim,
+            secenekler: ['', ...stokAdlari.keys],
+            gorunur: (d) => !makine(d) && !yevmiye(d),
+            aciklama: 'Seçerseniz kullandığınız miktar ana depodan düşer; '
+                'fiyat alıştaki birim fiyattan gelir.'),
+      Alan('kalem', 'Gider kalemi', tip: AlanTip.secim,
+          secenekler: giderKalemleri.keys.toList()),
       Alan('isTuru', 'Yapılan iş', tip: AlanTip.secim,
           secenekler: makineIsleri, gorunur: makine),
       Alan('yapan', 'İşi yapan', oneriler: yapanlar,
@@ -148,11 +193,16 @@ Future<void> giderFormu(BuildContext context, Durum durum,
           secenekler: const ['Tamamını ben ödedim', 'Sadece kendi payımı ödedim', 'Henüz ödenmedi'],
           gorunur: ortakSayac),
       Alan('tedarikci', 'Nereden alındı / kime ödendi',
-          oneriler: yapanlar, gorunur: (d) => !makine(d) && !yevmiye(d)),
-      const Alan('odendi', 'Ödendi', tip: AlanTip.anahtar,
+          oneriler: yapanlar, gorunur: (d) => !makine(d) && !yevmiye(d) && !stoktan(d)),
+      Alan('odendi', 'Ödendi', tip: AlanTip.anahtar,
+          gorunur: (d) => !stoktan(d),
           ipucu: 'Kapatırsanız tutar, işi yapan / satıcı adına Borçlarım\'a yazılır.'),
     ],
     degisince: (key, d) {
+      if (key == 'stok') {
+        stoktanDoldur(d);
+        return;
+      }
       if (key == 'kalem') {
         final kalem = (d['kalem'] ?? '').toString();
         d['birim'] = giderKalemleri[kalem] ?? 'adet';
@@ -178,6 +228,23 @@ Future<void> giderFormu(BuildContext context, Durum durum,
       }
     },
     ozet: (d) {
+      final st = secilenStok(d);
+      if (st != null) {
+        final kalan = v.stokKalan(st.id, haric: gider?.id);
+        final sonra = kalan - _n(d['miktar']);
+        final b = st.s('birim');
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Satir('Depoda kalan', '${sayi(kalan)} $b'),
+            Satir('Bu kullanımdan sonra', '${sayi(sonra)} $b',
+                kalin: true, renk: sonra < 0 ? Renk.kirmizi : Renk.altin),
+            Satir('Maliyet', tl(_n(d['tutar']))),
+            if (sonra < 0)
+              const Text('Depodaki miktardan fazla.', style: TextStyle(color: Renk.kirmizi)),
+          ],
+        );
+      }
       final tutar = _n(d['tutar']);
       final miktar = yevmiye(d) ? _n(d['kisi']) * _n(d['gun']) : _n(d['miktar']);
       List<String> ids;
@@ -222,6 +289,16 @@ Future<void> giderFormu(BuildContext context, Durum durum,
       );
     },
     onKaydet: (d) async {
+      final stok = (makine(d) || yevmiye(d)) ? null : secilenStok(d);
+      d.remove('stok');
+      if (stok != null) {
+        if (_n(d['miktar']) <= 0) throw 'Kullanılan miktarı girin.';
+        d['stokId'] = stok.id;
+        d['odendi'] = true; // ödeme toplu alımda takip edilir
+        d['tedarikci'] = stok.s('tedarikci').isEmpty ? 'Ortak stok' : stok.s('tedarikci');
+      } else {
+        d['stokId'] = null;
+      }
       final kalem = (d['kalem'] ?? '').toString();
       if (yevmiye(d)) d['miktar'] = _n(d['kisi']) * _n(d['gun']);
       final sayacAd = (d.remove('sayac') ?? '').toString();
@@ -409,7 +486,7 @@ class _UretimSayfasiState extends State<UretimSayfasi> {
           ),
           const SizedBox(height: 6),
           SecimSatiri(
-            secenekler: const ['Ekimler', 'Ürünler', 'Giderler'],
+            secenekler: const ['Ekimler', 'Ürünler', 'Giderler', 'Stok'],
             secili: _sekme,
             onSec: (s) => setState(() => _sekme = s),
           ),
@@ -426,6 +503,7 @@ class _UretimSayfasiState extends State<UretimSayfasi> {
           ],
           if (_sekme == 'Ürünler') ..._urunler(v),
           if (_sekme == 'Giderler') ..._giderler(context, v),
+          if (_sekme == 'Stok') ...stokSekmesi(context, durum, v),
         ];
       },
     );
