@@ -47,6 +47,23 @@ class _ProfilKapi extends StatefulWidget {
 
 class _ProfilKapiState extends State<_ProfilKapi> {
   late final _akis = Veri.kullanicilar.doc(widget.uid).snapshots();
+  bool _denendi = false;
+
+  /// Uygulama yeni Firebase projesine geçtiğinde telefonda eski projeden
+  /// kalan oturum geçersizdir: okumalar "yetkiniz yok" döner. Oturumu
+  /// yenilemeyi dener, olmazsa çıkış yapıp giriş ekranına döner.
+  Future<void> _oturumuDene() async {
+    if (_denendi) return;
+    _denendi = true;
+    try {
+      await FirebaseAuth.instance.currentUser?.getIdToken(true);
+      await FirebaseAuth.instance.currentUser?.reload();
+      if (mounted) setState(() {});
+    } catch (_) {
+      await Keles.cikis();
+      await FirebaseAuth.instance.signOut();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -54,7 +71,12 @@ class _ProfilKapiState extends State<_ProfilKapi> {
       stream: _akis,
       builder: (context, s) {
         if (s.hasError) {
-          return _HataEkrani(yazi: hataYazisi(s.error!));
+          final e = s.error;
+          if (e is FirebaseException && e.code == 'permission-denied') _oturumuDene();
+          return _HataEkrani(
+              yazi: '${hataYazisi(e!)}\n\nUygulama güncellendiyse telefondaki eski oturum '
+                  'geçersiz kalmış olabilir: "Çıkış yap"a basıp e-posta ve şifrenizle '
+                  'yeniden giriş yapın.');
         }
         if (!s.hasData) return const _Yukleniyor();
         final d = s.data!.data() ?? {};
