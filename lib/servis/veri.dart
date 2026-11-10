@@ -54,8 +54,39 @@ class Veri {
     'stoklar',
   ];
 
-  static CollectionReference<Map<String, dynamic>> kol(String iid, String ad) =>
-      isletmeler.doc(iid).collection(ad);
+  /// Tarla ve üretim ortak; borç-alacak, varlık, iş yeri-maaş, notlar,
+  /// belgeler, ev harcamaları ve kişisel gelirler her üyenin kendine ait
+  /// (kisisel/{uid}/...). İşletme sahibinin (yönetici) kişisel verisi eskisi
+  /// gibi işletmenin kökünde durur.
+  static String? kisiselUid;
+  static const hepKisisel = {'hesaplar', 'varliklar', 'isyerleri', 'isler', 'belgeler'};
+
+  /// Kişisel alandan okunan giderler/gelirlerin kimlikleri (düzenle-sil yönü).
+  static final Set<String> kisiselIdler = {};
+
+  static CollectionReference<Map<String, dynamic>> kisiselKol(String iid, String uid, String ad) =>
+      isletmeler.doc(iid).collection('kisisel').doc(uid).collection(ad);
+
+  static CollectionReference<Map<String, dynamic>> kol(String iid, String ad) {
+    final u = kisiselUid;
+    if (u != null && hepKisisel.contains(ad)) return kisiselKol(iid, u, ad);
+    return isletmeler.doc(iid).collection(ad);
+  }
+
+  /// Yazılacak yer: kişisel üyenin ev harcaması ve kişisel geliri kendi alanına.
+  static CollectionReference<Map<String, dynamic>> _yazKol(
+      String iid, String koleksiyon, Map<String, dynamic> veri, String? id) {
+    final u = kisiselUid;
+    if (u != null && (koleksiyon == 'giderler' || koleksiyon == 'gelirler')) {
+      if (id != null && id.isNotEmpty) {
+        if (kisiselIdler.contains(id)) return kisiselKol(iid, u, koleksiyon);
+      } else if ((koleksiyon == 'giderler' && veri['alan'] == 'ev') ||
+          (koleksiyon == 'gelirler' && veri['tur'] != 'Destek')) {
+        return kisiselKol(iid, u, koleksiyon);
+      }
+    }
+    return kol(iid, koleksiyon);
+  }
 
   static DocumentReference<Map<String, dynamic>> gizli(String iid) =>
       isletmeler.doc(iid).collection('gizli').doc('kodlar');
@@ -168,13 +199,13 @@ class Veri {
         for (final e in veri.entries)
           if (e.value != null) e.key: e.value
       };
-      final ref = kol(iid, koleksiyon).doc();
+      final ref = _yazKol(iid, koleksiyon, veri, null).doc();
       await ref.set({...temiz, 'olusturma': simdi, 'olusturan': uid ?? ''});
       return ref.id;
     }
     // update: verilen alanların tamamı (iç içe haritalar dahil) değişir,
     // null olan alanlar silinir.
-    await kol(iid, koleksiyon).doc(id).update({
+    await _yazKol(iid, koleksiyon, veri, id).doc(id).update({
       for (final e in veri.entries)
         e.key: e.value ?? FieldValue.delete(),
     });
@@ -187,7 +218,7 @@ class Veri {
     for (var i = 0; i < kayitlar.length; i += 400) {
       final b = _db.batch();
       for (final k in kayitlar.skip(i).take(400)) {
-        b.set(kol(iid, koleksiyon).doc(), {
+        b.set(_yazKol(iid, koleksiyon, k, null).doc(), {
           for (final e in k.entries)
             if (e.value != null) e.key: e.value,
           'olusturma': simdi,
@@ -199,7 +230,7 @@ class Veri {
   }
 
   static Future<void> sil(String iid, String koleksiyon, String id) =>
-      kol(iid, koleksiyon).doc(id).delete();
+      _yazKol(iid, koleksiyon, const {}, id).doc(id).delete();
 
   /// Borç/alacak hesabına hareket ekler.
   static Future<void> hareketEkle(String iid, String hesapId,
@@ -309,18 +340,21 @@ class Durum extends ChangeNotifier {
   /// Yalnızca tarla ve üretimi gören üye (kişisel hesaplar gizli).
   bool get sinirli => uye && !yonetici && !(isletme?.tamYetki.contains(uid) ?? false);
 
-  /// Sınırlı üyenin okuyamadığı (kurallarla da kapalı) kişisel koleksiyonlar.
-  static const kisiselKoleksiyonlar = {'hesaplar', 'varliklar', 'isyerleri'};
   bool? _abonelikSinirli;
+
+  /// Kişisel alandan (kisisel/{uid}) okunanlar; ortak verilerle birleşir.
+  final Map<String, List<Kayit>> _kk = {};
   bool get yuklendi => _yuklenen.length == Veri.koleksiyonlar.length;
 
   Veriler _v = Veriler();
   Veriler get v => _v;
 
   void _yenile() {
-    _v = Veriler(isletme: isletme, koleksiyonlar: Map.of(_k));
+    final hepsi = Map.of(_k);
+    _kk.forEach((ad, l) => hepsi[ad] = [...?hepsi[ad], ...l]);
+    _v = Veriler(isletme: isletme, koleksiyonlar: hepsi);
     notifyListeners();
-    if (uye && yuklendi && (isletme?.aile.isNotEmpty ?? false)) {
+    if (uye && !sinirli && yuklendi && (isletme?.aile.isNotEmpty ?? false)) {
       _ozetZamanlayici?.cancel();
       _ozetZamanlayici = Timer(const Duration(seconds: 3), _aileOzetleriniYaz);
     }
@@ -379,7 +413,9 @@ class Durum extends ChangeNotifier {
           a.cancel();
         }
         _aboneler.clear();
+        _kk.clear();
         _abonelikSinirli = sinirli;
+        Veri.kisiselUid = sinirli ? uid : null;
         _koleksiyonlariDinle();
       }
       if (aileUyesi && _aoAbone == null) _aileDinle();
@@ -406,14 +442,36 @@ class Durum extends ChangeNotifier {
   }
 
   void _koleksiyonlariDinle() {
+    final kisisel = sinirli;
+    if (kisisel) {
+      // Üyenin kendi alanı: borç-alacak, varlık, maaş, notlar, belgeler,
+      // ev harcamaları ve kişisel gelirler.
+      for (final ad in {...Veri.hepKisisel, 'giderler', 'gelirler'}) {
+        if (!Veri.koleksiyonlar.contains(ad)) continue; // belgeler istenince okunur
+        _aboneler.add(Veri.kisiselKol(iid, uid, ad).limit(5000).snapshots().listen((s) {
+          _kk[ad] = [for (final d in s.docs) Kayit(d.id, d.data())];
+          Veri.kisiselIdler.addAll(s.docs.map((d) => d.id));
+          _yenile();
+        }, onError: (Object e) {
+          debugPrint('kişisel $ad okunamadı: $e');
+          _kk[ad] = const [];
+          _yenile();
+        }));
+      }
+    }
     for (final ad in Veri.koleksiyonlar) {
-      if (sinirli && kisiselKoleksiyonlar.contains(ad)) {
+      // Kişisel üye: başkasının kişisel kayıtları ve aile para hareketleri okunmaz.
+      if (kisisel && (Veri.hepKisisel.contains(ad) || ad == 'aile_hareketler')) {
         _k[ad] = const [];
         _yuklenen.add(ad);
         continue;
       }
-      _aboneler.add(Veri.kol(iid, ad).limit(5000).snapshots().listen((s) {
-        _k[ad] = [for (final d in s.docs) Kayit(d.id, d.data())];
+      _aboneler.add(Veri.isletmeler.doc(iid).collection(ad).limit(5000).snapshots().listen((s) {
+        var l = [for (final d in s.docs) Kayit(d.id, d.data())];
+        // Ortak alandaki ev harcamaları ve maaş gibi gelirler sahibinindir.
+        if (kisisel && ad == 'giderler') l = l.where((g) => g.s('alan') != 'ev').toList();
+        if (kisisel && ad == 'gelirler') l = l.where((g) => g.s('tur') == 'Destek').toList();
+        _k[ad] = l;
         _yuklenen.add(ad);
         _yenile();
       }, onError: (Object e) {
@@ -455,6 +513,8 @@ class Durum extends ChangeNotifier {
   @override
   void dispose() {
     _kapandi = true;
+    Veri.kisiselUid = null;
+    Veri.kisiselIdler.clear();
     _ozetZamanlayici?.cancel();
     _aoAbone?.cancel();
     _ahAbone?.cancel();

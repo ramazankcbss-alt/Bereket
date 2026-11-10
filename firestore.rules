@@ -145,6 +145,14 @@ service cloud.firestore {
             && tarlamAileAdi(iid) != '' && resource.data.kisi == tarlamAileAdi(iid));
       }
 
+      // Her üyenin kendi alanı: borç-alacak, varlık, maaş, notlar, belgeler,
+      // ev harcamaları, kişisel gelirler. Yalnızca kendisi okur ve yazar.
+      match /kisisel/{userId}/{kol}/{belge} {
+        allow read, delete: if signedIn() && uid() == userId && tarlamUye(iid);
+        allow create, update: if signedIn() && uid() == userId && tarlamUye(iid)
+          && request.resource.data.size() <= 60;
+      }
+
       // Tarlalar, ekimler, giderler, satışlar, hesaplar, gelirler...
       match /{koleksiyon}/{belge} {
         function tarlamKoleksiyon() {

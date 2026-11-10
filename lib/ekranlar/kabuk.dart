@@ -71,21 +71,6 @@ class _KabukState extends State<Kabuk> {
                 f();
               },
             );
-        if (d.sinirli) {
-          return SafeArea(
-            child: ListView(
-              shrinkWrap: true,
-              children: [
-                oge('🧾', 'Tarla gideri / fatura', () => giderFormu(context, d)),
-                oge('🚜', 'Makine işçiliği / yevmiye', () => giderFormu(context, d, iscilik: true)),
-                oge('💰', 'Satış', () => satisFormu(context, d)),
-                oge('🌱', 'Ekim / hasat', () => ekimFormu(context, d)),
-                oge('🗺️', 'Tarla', () => tarlaFormu(context, d)),
-                oge('📋', 'Görev', () => isFormu(context, d)),
-              ],
-            ),
-          );
-        }
         return SafeArea(
           child: ListView(
             shrinkWrap: true,
@@ -119,9 +104,6 @@ class _KabukState extends State<Kabuk> {
       RaporlarSayfasi(durum: d),
       ProfilSayfasi(durum: d),
     ];
-    // Sınırlı üye (yalnızca tarla ve üretim): Ev Bütçem ve Raporlar gizli.
-    final sinirli = d.sinirli;
-    if (sinirli && (_sekme == 1 || _sekme == 2)) _sekme = 0;
     return Scaffold(
       body: IndexedStack(index: _sekme, children: sayfalar),
       bottomNavigationBar: Container(
@@ -141,7 +123,7 @@ class _KabukState extends State<Kabuk> {
             child: Row(
               children: [
                 _altOge(0, '🏡', 'Ana'),
-                if (!sinirli) _altOge(1, '🏠', 'Ev Bütçem'),
+                _altOge(1, '🏠', 'Ev Bütçem'),
                 Expanded(
                   child: Center(
                     child: GestureDetector(
@@ -166,7 +148,7 @@ class _KabukState extends State<Kabuk> {
                     ),
                   ),
                 ),
-                if (!sinirli) _altOge(2, '📊', 'Raporlar'),
+                _altOge(2, '📊', 'Raporlar'),
                 _altOge(3, '👤', 'Profil'),
               ],
             ),

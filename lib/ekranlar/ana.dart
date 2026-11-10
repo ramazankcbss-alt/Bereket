@@ -33,7 +33,6 @@ class UstSayaclar extends StatelessWidget {
     final yil = DateTime.now().year;
     final o = v.yilOzet(yil);
     final depo = v.depo().fold(0.0, (a, d) => a + d.deger);
-    final sinirli = durum.sinirli;
     return Row(
       children: [
         Expanded(
@@ -45,7 +44,6 @@ class UstSayaclar extends StatelessWidget {
             onTap: () => git(context, UretimSayfasi(durum: durum)),
           ),
         ),
-        if (!sinirli) ...[
         const SizedBox(width: 6),
         Expanded(
           child: SayacHapi(
@@ -66,7 +64,6 @@ class UstSayaclar extends StatelessWidget {
             onTap: () => git(context, HesaplarSayfasi(durum: durum, yon: 'borc')),
           ),
         ),
-        ],
         const SizedBox(width: 6),
         Expanded(
           child: SayacHapi(
@@ -104,7 +101,7 @@ class AnaSayfa extends StatelessWidget {
                 UstSayaclar(durum: durum, v: v),
                 const SizedBox(height: 12),
                 _profilKarti(context, v),
-                if (!durum.sinirli) _odemeler(context, v),
+                _odemeler(context, v),
                 ..._menuler(context, v),
                 if (durum.hata != null)
                   Panel(
@@ -125,7 +122,7 @@ class AnaSayfa extends StatelessWidget {
   Widget _baslik(BuildContext context) {
     return Row(
       children: [
-        if (durum.sinirli) const SizedBox(width: 48) else InkWell(
+        InkWell(
           borderRadius: BorderRadius.circular(14),
           onTap: () => git(context, BelgeOkut(durum: durum)),
           child: Container(
@@ -200,7 +197,7 @@ class AnaSayfa extends StatelessWidget {
               ),
             ],
           ),
-          if (!durum.sinirli) ...[
+          ...[
           const Divider(height: 22),
           InkWell(
             borderRadius: BorderRadius.circular(12),
@@ -358,8 +355,8 @@ class AnaSayfa extends StatelessWidget {
         MenuOge('📈', 'Piyasa', 'Borsa · TMO fiyatları',
             () => ac(PiyasaSayfasi(durum: durum)), renk: const Color(0xFF3B6FD0)),
       ]),
-      if (!durum.sinirli)
       KareMenu(baslik: 'Para', ogeler: [
+        if (!durum.sinirli)
         MenuOge('👨‍👩‍👦', 'Aile Hesapları',
             odemeler.isEmpty ? 'Hesaplar denk' : '${odemeler.length} ödeme var',
             () => ac(AileSayfasi(durum: durum)), renk: const Color(0xFF2E8B57)),
@@ -379,7 +376,6 @@ class AnaSayfa extends StatelessWidget {
       KareMenu(baslik: 'Diğer', ogeler: [
         MenuOge('📋', 'Görevler', acikIs == 0 ? 'Görev yok' : '$acikIs açık görev',
             () => ac(IslerSayfasi(durum: durum)), renk: const Color(0xFFE08A3C)),
-        if (!durum.sinirli)
         MenuOge('🪙', 'Varlıklarım', 'Birikim · ev bütçesi',
             () => ac(VarliklarSayfasi(durum: durum)), renk: const Color(0xFFC9A227)),
         if (!durum.sinirli)

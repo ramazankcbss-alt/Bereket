@@ -326,9 +326,9 @@ class ProfilSayfasi extends StatelessWidget {
                         builder: (c) => AlertDialog(
                           title: Text('${e.value} tarla ve üretimi yönetsin mi?'),
                           content: const Text(
-                              'Sizin gibi tüm tarla, üretim, satış, depo ve stok ekranlarını görür; '
-                              'ekleme, düzenleme ve silme yapabilir. Borçlarınızı, alacaklarınızı, '
-                              'varlıklarınızı, ev bütçenizi ve maaşınızı göremez.'),
+                              'Tarla, üretim, satış, depo ve stok ortak olur; ekleme, düzenleme ve '
+                              'silme yapabilir. Kendi borç-alacak, ev bütçesi, maaş ve notlarını '
+                              'ayrı tutar; sizinkileri göremez.'),
                           actions: [
                             TextButton(
                                 onPressed: () => Navigator.pop(c, false), child: const Text('Vazgeç')),
@@ -428,7 +428,7 @@ class ProfilSayfasi extends StatelessWidget {
                           ? 'Yönetici'
                           : (i.tamYetki.contains(u)
                               ? 'Üye · kişisel hesapları da görür'
-                              : 'Üye · yalnızca tarla ve üretim')),
+                              : 'Üye · tarla ve üretim ortak, kendi hesapları ayrı')),
                   style: yaziSoluk),
               trailing: durum.yonetici && u != i.sahip && u != durum.uid
                   ? PopupMenuButton<String>(
@@ -476,7 +476,8 @@ class ProfilSayfasi extends StatelessWidget {
             const Divider(height: 18),
             const Text(
                 'Davet kodu: babanız, kardeşiniz ya da çalışanınız bu kodla katılır. Tarla ve '
-                'üretimde kayıt ekleyip düzenleyebilir; borç, alacak, varlık ve ev bütçenizi göremez. '
+                'üretim ortaktır, birlikte ekleyip düzenlersiniz. Borç-alacak, varlık, ev bütçesi, '
+                'maaş ve notları herkesin kendine aittir; birbirinizinkini göremezsiniz. '
                 'Uygulamaya girmiş biri Profil → "Yeni kod gir" ile de katılabilir.',
                 style: yaziSoluk),
             const SizedBox(height: 8),

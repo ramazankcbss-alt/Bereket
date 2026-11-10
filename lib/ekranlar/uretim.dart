@@ -202,7 +202,7 @@ Future<void> giderFormu(BuildContext context, Durum durum,
           gorunur: (d) => !stoktan(d) && !ortakSayac(d),
           aciklama: 'Kullanan ayrı olabilir; kim kime borçlu Aile Hesapları\'nda çıkar.'),
       Alan('odendi', 'Ödendi', tip: AlanTip.anahtar,
-          gorunur: (d) => !stoktan(d) && !durum.sinirli,
+          gorunur: (d) => !stoktan(d),
           ipucu: 'Kapatırsanız tutar, işi yapan / satıcı adına Borçlarım\'a yazılır.'),
     ],
     degisince: (key, d) {
@@ -298,8 +298,6 @@ Future<void> giderFormu(BuildContext context, Durum durum,
     onKaydet: (d) async {
       final stok = (makine(d) || yevmiye(d)) ? null : secilenStok(d);
       d.remove('stok');
-      // Sınırlı üye Borçlarım'a yazamaz: ödeme takibi sahibinde.
-      if (durum.sinirli) d['odendi'] = true;
       if (stok != null) {
         if (_n(d['miktar']) <= 0) throw 'Kullanılan miktarı girin.';
         d['stokId'] = stok.id;
@@ -325,10 +323,10 @@ Future<void> giderFormu(BuildContext context, Durum durum,
         d['miktar'] = benimKwh(d);
         d['birim'] = 'kWh';
         if ((d['tedarikci'] ?? '').toString().isEmpty) d['tedarikci'] = sayac?.s('kurum') ?? 'MEDAŞ';
-        d['odendi'] = durum.sinirli || d['odeme'] != 'Henüz ödenmedi';
+        d['odendi'] = d['odeme'] != 'Henüz ödenmedi';
       }
       await durum.kaydet('giderler', d, id: gider?.id);
-      if (yeni && ortakFatura && d['odeme'] == 'Tamamını ben ödedim' && !durum.sinirli) {
+      if (yeni && ortakFatura && d['odeme'] == 'Tamamını ben ödedim') {
         final digerPay = _n(d['faturaTutar']) - _n(d['tutar']);
         if (digerPay > 0) {
           await Veri.borcaYaz(durum.iid, v,
@@ -447,7 +445,7 @@ class _UretimSayfasiState extends State<UretimSayfasi> {
       makine,
       if (v.stoklar.isNotEmpty) stoktan,
       toplu,
-      if (!durum.sinirli) fis,
+      fis,
     ]);
     if (s == null || !context.mounted) return;
     switch (s) {
