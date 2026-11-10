@@ -190,6 +190,9 @@ Future<void> ekimFormu(BuildContext context, Durum durum,
       Alan('dekar', 'Ekilen alan', tip: AlanTip.sayi, birim: 'dekar', zorunlu: true,
           gorunur: (d) => d['farkliAlan'] == true,
           aciklama: 'Giderler aynı tarladaki ekimlere bu alanlara göre bölünür.'),
+      Alan('kiraDekar', 'Kira dekar fiyatı', tip: AlanTip.sayi, birim: '₺/da',
+          gorunur: (d) => !verildi(d) && kiralik(d),
+          aciklama: 'Yazınca kira bedeli ekilen alanla çarpılıp kendiliğinden hesaplanır.'),
       Alan('urun', 'Ürün', tip: AlanTip.secim,
           secenekler: [for (final u in urunler) u.ad], zorunlu: true),
       Alan('cks', 'ÇKS kimin üzerine', tip: AlanTip.secim,
@@ -276,6 +279,18 @@ Future<void> ekimFormu(BuildContext context, Durum durum,
           if (kalan > 0) d['dekar'] = kalan;
         }
       }
+      // Kira bedeli = dekar fiyatı × ekilen alan.
+      if (key == 'kiraDekar' || key == 'dekar' || key == 'farkliAlan' || key == 'tarlaId' ||
+          key == 'mulkiyet') {
+        final df = d['kiraDekar'] is num ? (d['kiraDekar'] as num).toDouble() : 0.0;
+        if (df > 0 && kiralik(d)) {
+          final t = v.tarla((d['tarlaId'] ?? '').toString());
+          final alan = d['farkliAlan'] == true
+              ? (d['dekar'] is num ? (d['dekar'] as num).toDouble() : 0.0)
+              : (t?.n('dekar') ?? 0.0);
+          if (alan > 0) d['kira'] = double.parse((df * alan).toStringAsFixed(2));
+        }
+      }
       if (key != 'yil') return;
       final y = d['yil'] is num ? (d['yil'] as num).toInt() : buYil;
       if (y > buYil) {
@@ -294,6 +309,7 @@ Future<void> ekimFormu(BuildContext context, Durum durum,
       }
       if (!kiralik(d)) {
         d['kira'] = null;
+        d['kiraDekar'] = null;
         d['kiraVeren'] = null;
       }
       if (d['durum'] == ekimPlanlaniyor) d['ekimTarihi'] = null;
