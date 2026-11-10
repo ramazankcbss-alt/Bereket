@@ -31,7 +31,7 @@ jobs:
       - name: Mod
         run: |
           MOD="${{ github.event.inputs.mod }}"
-          [ -z "$MOD" ] && MOD=$(tr -d ' \r\n' < tasima/komut.txt)
+          [ -z "$MOD" ] && MOD=$(head -1 tasima/komut.txt | tr -d " \r\n")
           case "$MOD" in kontrol|tasi) ;; *) echo "::error::Geçersiz mod: $MOD"; exit 1;; esac
           echo "MOD=$MOD" >> "$GITHUB_ENV"
           echo "Mod: $MOD"
