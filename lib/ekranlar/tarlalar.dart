@@ -131,6 +131,23 @@ Future<void> tarlaFormu(BuildContext context, Durum durum, {Kayit? tarla}) async
   );
 }
 
+/// Yeni hesap sahibi (kişi) ekler; Profil'deki listeye ve Aile Hesapları'na girer.
+Future<String?> yeniKisi(BuildContext context, Durum durum) async {
+  final s = (await metinSor(context, 'Kişi adı', ipucu: 'Örn. Amcam, Ali Yılmaz'))?.trim();
+  if (s == null || s.isEmpty) return null;
+  final v = durum.v;
+  if (!v.sahipler().contains(s)) {
+    final liste = v.sahipler().where((x) => x != Veriler.ben).toList();
+    try {
+      await durum.ayarYaz('sahipler', {...liste, s}.toList());
+    } catch (e) {
+      if (context.mounted) bildir(context, hataYazisi(e));
+      return null;
+    }
+  }
+  return s;
+}
+
 /// Ekim / hasat kaydı. Gelecek yılın sezonu seçilirse durum "Ekim planlanıyor" olur
 /// (ÇKS'de gelecek yılın ürünü bu yılın başvuru döneminde yazılır).
 Future<void> ekimFormu(BuildContext context, Durum durum,
@@ -180,6 +197,8 @@ Future<void> ekimFormu(BuildContext context, Durum durum,
           secenekler: [for (final u in urunler) u.ad], zorunlu: true),
       Alan('sahip', 'Kim ekiyor', tip: AlanTip.secim,
           secenekler: v.sahipler(),
+          yeniYazi: '+ Yeni kişi',
+          yeniEkle: (c) => yeniKisi(c, durum),
           aciklama: 'Maliyet, satış ve kâr bu kişinin hesabına yazılır.'),
       ...ortakAlanlari(v.sahipler()),
       Alan('destekSahibi', 'Mazot-gübre desteği kimin', tip: AlanTip.secim,

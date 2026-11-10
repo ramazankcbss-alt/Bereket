@@ -15,6 +15,8 @@ class Alan {
     this.tip = AlanTip.metin,
     this.secenekler = const [],
     this.seceneklerFn,
+    this.yeniEkle,
+    this.yeniYazi = '+ Yeni ekle',
     this.oneriler = const [],
     this.zorunlu = false,
     this.ipucu,
@@ -30,6 +32,11 @@ class Alan {
 
   /// Seçenekler başka alanlara bağlıysa (il → ilçe → mahalle).
   final List<String> Function(Map<String, dynamic> d)? seceneklerFn;
+
+  /// Seçim listesinin sonuna "yeni ekle" satırı koyar; seçilince bu çağrılır
+  /// ve dönen değer alana yazılır (ör. yeni kişi).
+  final Future<String?> Function(BuildContext context)? yeniEkle;
+  final String yeniYazi;
 
   /// Metin alanının altında dokununca yazılan hazır seçenekler.
   final List<String> oneriler;
@@ -98,6 +105,8 @@ class _FormSayfasiState extends State<FormSayfasi> {
   late final Map<String, dynamic> _d = Map.of(widget.baslangic);
   final Map<String, TextEditingController> _c = {};
   bool _mesgul = false;
+  int _yenile = 0;
+  static const _yeniDeger = '\u0000yeni';
 
   bool _metinli(AlanTip t) =>
       t == AlanTip.metin || t == AlanTip.sayi || t == AlanTip.uzun;
@@ -258,7 +267,7 @@ class _FormSayfasiState extends State<FormSayfasi> {
         ];
         return DropdownButtonFormField<String>(
           // Değer başka bir alana göre değişirse (degisince) kutu da yenilensin.
-          key: ValueKey('${a.key}:$sS'),
+          key: ValueKey('${a.key}:$sS:$_yenile'),
           initialValue: sS.isEmpty ? null : sS,
           isExpanded: true,
           dropdownColor: Renk.kartAcik,
@@ -267,8 +276,25 @@ class _FormSayfasiState extends State<FormSayfasi> {
             for (final s in lS)
               DropdownMenuItem(
                   value: s, child: Text(s.isEmpty ? '— (varsayılan)' : s)),
+            if (a.yeniEkle != null)
+              DropdownMenuItem(
+                  value: _yeniDeger,
+                  child: Text(a.yeniYazi,
+                      style: const TextStyle(color: Renk.yesil, fontWeight: FontWeight.w700))),
           ],
-          onChanged: (s) {
+          onChanged: (s) async {
+            if (s == _yeniDeger) {
+              final yeni = (await a.yeniEkle!(context))?.trim() ?? '';
+              if (!mounted) return;
+              if (yeni.isEmpty) {
+                setState(() => _yenile++); // eski seçim geri gelsin
+                return;
+              }
+              _d[a.key] = yeni;
+              _yenile++;
+              _degisti(a.key);
+              return;
+            }
             _d[a.key] = s;
             _degisti(a.key);
           },
