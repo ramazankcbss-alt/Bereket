@@ -11,7 +11,7 @@ class Renk {
   static const kartAcik = Color(0xFFEEF2F6);
   static const cizgi = Color(0xFFDCE2E8);
   static const yazi = Color(0xFF1A2230);
-  static const soluk = Color(0xFF5F6B7D);
+  static const soluk = Color(0xFF465366);
 
   // Vurgu renkleri beyaz üstünde okunacak koyulukta.
   static const altin = Color(0xFFB7800C);
@@ -754,7 +754,7 @@ class Cubuk extends StatelessWidget {
           Center(
             child: Text(yazi,
                 style: const TextStyle(
-                    color: Colors.white,
+                    color: Renk.yazi,
                     fontSize: 13,
                     fontWeight: FontWeight.w700)),
           ),
@@ -957,9 +957,11 @@ class KareMenu extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [r.withValues(alpha: 0.28), r.withValues(alpha: 0.08)],
+              colors: [r, Color.lerp(r, Colors.black, 0.28)!],
             ),
-            border: Border.all(color: r.withValues(alpha: 0.45), width: 1.2),
+            boxShadow: [
+              BoxShadow(color: r.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 3)),
+            ],
           ),
           child: Stack(
             children: [
@@ -973,7 +975,7 @@ class KareMenu extends StatelessWidget {
                       height: 42,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.75),
+                        color: Colors.white.withValues(alpha: 0.9),
                         borderRadius: BorderRadius.circular(13),
                       ),
                       child: Text(o.simge, style: const TextStyle(fontSize: 24)),
@@ -983,12 +985,17 @@ class KareMenu extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                            color: Renk.yazi, fontSize: 14.5, height: 1.15, fontWeight: FontWeight.w800)),
+                            color: Colors.white,
+                            fontSize: 15,
+                            height: 1.15,
+                            fontWeight: FontWeight.w900,
+                            shadows: [Shadow(color: Color(0x55000000), offset: Offset(0, 1), blurRadius: 2)])),
                     const SizedBox(height: 3),
                     Text(o.alt,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Renk.soluk, fontSize: 11.5, height: 1.2)),
+                        style: const TextStyle(
+                            color: Color(0xF2FFFFFF), fontSize: 12, height: 1.2, fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
@@ -1000,7 +1007,9 @@ class KareMenu extends StatelessWidget {
                     constraints: const BoxConstraints(maxWidth: 70),
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                        color: Renk.kirmizi, borderRadius: BorderRadius.circular(10)),
+                        color: Renk.kirmizi,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white, width: 1.5)),
                     child: Text(o.rozet!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,

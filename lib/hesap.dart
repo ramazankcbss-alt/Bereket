@@ -894,6 +894,37 @@ class Veriler {
   }
 
   /// Vadesi geçmiş borç toplamı.
+  /// Ödeme takvimi: vadesi geçmiş, bugün ödenecek ve [gun] gün içinde
+  /// yaklaşan borç ödemeleri (vade tarihi ya da aylık ödeme günü olanlar).
+  List<OdemeGunu> odemeTakvimi(DateTime simdi, {int gun = 15}) {
+    final bugun = DateTime(simdi.year, simdi.month, simdi.day);
+    final out = <OdemeGunu>[];
+    for (final h in hesaplar) {
+      if (h.s('yon') == 'alacak' || bakiye(h) <= 0) continue;
+      final tutar = h.n('taksitTutari') > 0 ? h.n('taksitTutari') : bakiyeTl(h);
+      DateTime? t;
+      if (h.n('odemeGunu') > 0) {
+        final g = h.n('odemeGunu').toInt();
+        // Bu ay ödeme yapıldıysa sıradaki ay.
+        final buAyOdendi = h.liste('hareketler').any((x) {
+          if (x['tip'] != 'odeme' || x['t'] is! num) return false;
+          final d = DateTime.fromMillisecondsSinceEpoch((x['t'] as num).toInt());
+          return d.year == bugun.year && d.month == bugun.month;
+        });
+        t = DateTime(bugun.year, bugun.month + (buAyOdendi ? 1 : 0), g);
+      } else if (h.t('vade') > 0) {
+        final d = DateTime.fromMillisecondsSinceEpoch(h.t('vade'));
+        t = DateTime(d.year, d.month, d.day);
+      }
+      if (t == null) continue;
+      final kalan = t.difference(bugun).inDays;
+      if (kalan > gun) continue;
+      out.add(OdemeGunu(h, t, tutar, kalan));
+    }
+    out.sort((a, b) => a.tarih.compareTo(b.tarih));
+    return out;
+  }
+
   double gecikmisBorc(int simdi) => hesaplar
       .where((h) => h.s('yon') != 'alacak' && h.t('vade') > 0 && h.t('vade') < simdi)
       .fold(0.0, (a, h) => a + bakiyeTl(h).clamp(0, double.infinity).toDouble());
@@ -1454,6 +1485,16 @@ class KisiHesap {
 
   bool get bos =>
       odedi.abs() + yuk.abs() + hak.abs() + aldi.abs() + verdi.abs() + aldiPara.abs() < 1;
+}
+
+class OdemeGunu {
+  const OdemeGunu(this.hesap, this.tarih, this.tutar, this.kalanGun);
+  final Kayit hesap;
+  final DateTime tarih;
+  final double tutar;
+
+  /// Negatifse gecikmiş, 0 bugün.
+  final int kalanGun;
 }
 
 class Odeme {

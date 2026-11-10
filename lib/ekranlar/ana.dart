@@ -101,6 +101,7 @@ class AnaSayfa extends StatelessWidget {
                 UstSayaclar(durum: durum, v: v),
                 const SizedBox(height: 12),
                 _profilKarti(context, v),
+                _odemeler(context, v),
                 ..._menuler(context, v),
                 if (durum.hata != null)
                   Panel(
@@ -164,41 +165,69 @@ class AnaSayfa extends StatelessWidget {
     );
   }
 
-  /// Bütçem: cebimdeki para ve bu ayın gelir-gideri.
+  /// İşletme kartı; altında cebimdeki para ve bu ayın gelir-gideri.
   Widget _profilKarti(BuildContext context, Veriler v) {
+    final i = durum.isletme!;
     final simdi = DateTime.now();
     final cep = v.cebimdeki();
     final ay = v.ayOzeti(simdi.year, simdi.month);
     final fark = ay.gelir - ay.gider;
     final girilmedi = !v.varliklar.any((x) => x.s('tur') == 'Nakit' || x.s('tur') == 'Mevduat');
     return Panel(
-      onTap: () => git(context, VarliklarSayfasi(durum: durum)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              const Text('👛', style: TextStyle(fontSize: 30)),
+              const Text('👨‍🌾', style: TextStyle(fontSize: 34)),
               const SizedBox(width: 10),
-              const Expanded(
-                child: Text('CEBİMDEKİ PARA',
-                    style: TextStyle(
-                        color: Renk.soluk,
-                        fontSize: 12.5,
-                        letterSpacing: 1.2,
-                        fontWeight: FontWeight.w800)),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(i.ad, maxLines: 1, overflow: TextOverflow.ellipsis, style: yaziKalin),
+                    Text(
+                        '${durum.isim(durum.uid)} · ${durum.yonetici ? 'Sahip' : 'Üye'} · '
+                        '${v.tarlalar.length} parsel, ${sayi(v.toplamDekar)} da',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: yaziSoluk),
+                  ],
+                ),
               ),
-              const Icon(Icons.chevron_right, color: Renk.soluk),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(girilmedi ? 'Nakit / banka gir' : tl0(cep),
-              style: TextStyle(
-                  color: girilmedi ? Renk.soluk : Renk.kurumsal,
-                  fontSize: girilmedi ? 18 : 32,
-                  fontWeight: FontWeight.w900)),
+          const Divider(height: 22),
+          InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => git(context, VarliklarSayfasi(durum: durum)),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('👛  CEBİMDEKİ PARA',
+                          style: TextStyle(
+                              color: Renk.soluk,
+                              fontSize: 13,
+                              letterSpacing: 1.1,
+                              fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 2),
+                      Text(girilmedi ? 'Nakit / banka gir' : tl0(cep),
+                          style: TextStyle(
+                              color: girilmedi ? Renk.soluk : Renk.kurumsal,
+                              fontSize: girilmedi ? 18 : 30,
+                              fontWeight: FontWeight.w900)),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: Renk.soluk),
+              ],
+            ),
+          ),
           if (girilmedi)
-            const Text('Varlıklarım\'a "Nakit" ve "Mevduat" olarak elindeki parayı yaz.',
+            const Text('Varlıklarım\'a elindeki parayı "Nakit", bankadakini "Mevduat" olarak yaz.',
                 style: yaziSoluk),
           const SizedBox(height: 10),
           Row(
@@ -213,15 +242,84 @@ class AnaSayfa extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
-          Text(
-              fark >= 0
-                  ? 'Bu ay ${tl0(fark)} artıdasın.'
-                  : 'Bu ay ${tl0(-fark)} eksidesin.',
+          Text(fark >= 0 ? 'Bu ay ${tl0(fark)} artıdasın.' : 'Bu ay ${tl0(-fark)} eksidesin.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                  color: fark >= 0 ? Renk.yesilKoyu : Renk.kirmizi, fontWeight: FontWeight.w700)),
+                  color: fark >= 0 ? Renk.yesilKoyu : Renk.kirmizi, fontWeight: FontWeight.w800)),
         ],
       ),
+    );
+  }
+
+  /// Ödemelerim: vadesi geçmiş, bugün ve yaklaşan (15 gün) borç ödemeleri.
+  Widget _odemeler(BuildContext context, Veriler v) {
+    final l = v.odemeTakvimi(DateTime.now());
+    final gecikmis = l.where((o) => o.kalanGun < 0).toList();
+    final bugun = l.where((o) => o.kalanGun == 0).toList();
+    final yaklasan = l.where((o) => o.kalanGun > 0).toList();
+    Widget satir(OdemeGunu o) {
+      final (yazi, renk) = o.kalanGun < 0
+          ? ('${-o.kalanGun} gün gecikti', Renk.kirmizi)
+          : o.kalanGun == 0
+              ? ('Bugün', Renk.turuncu)
+              : ('${o.kalanGun} gün kaldı', Renk.mavi);
+      return InkWell(
+        onTap: () => git(context, HesapDetay(durum: durum, hesapId: o.hesap.id)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 7),
+          child: Row(
+            children: [
+              Container(width: 4, height: 34, color: renk),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(o.hesap.s('ad'), maxLines: 1, overflow: TextOverflow.ellipsis, style: yaziKalin),
+                    Text('${tarih(o.tarih.millisecondsSinceEpoch)} · $yazi',
+                        style: TextStyle(color: renk, fontSize: 13, fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              ),
+              Text(tl0(o.tutar),
+                  style: const TextStyle(color: Renk.yazi, fontSize: 16, fontWeight: FontWeight.w900)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    Widget grup(String baslik, List<OdemeGunu> x) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 6, bottom: 2),
+              child: Text(baslik,
+                  style: const TextStyle(
+                      color: Renk.soluk, fontSize: 12.5, letterSpacing: 1, fontWeight: FontWeight.w800)),
+            ),
+            for (final o in x) satir(o),
+          ],
+        );
+    return Panel(
+      baslik: '📅 Ödemelerim',
+      kenarRengi: gecikmis.isNotEmpty ? Renk.kirmizi : (bugun.isNotEmpty ? Renk.turuncu : null),
+      eylem: TextButton(
+        onPressed: () => git(context, HesaplarSayfasi(durum: durum, yon: 'borc')),
+        child: const Text('Tümü'),
+      ),
+      child: l.isEmpty
+          ? const Text('Önümüzdeki 15 günde ödeme yok. Borçlarım\'da vade ya da ödeme günü '
+              'girilen borçlar burada görünür.',
+              style: yaziSoluk)
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (gecikmis.isNotEmpty) grup('GECİKMİŞ', gecikmis),
+                if (bugun.isNotEmpty) grup('BUGÜN', bugun),
+                if (yaklasan.isNotEmpty) grup('YAKLAŞAN (15 GÜN)', yaklasan.take(6).toList()),
+              ],
+            ),
     );
   }
 
