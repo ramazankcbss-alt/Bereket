@@ -911,6 +911,11 @@ class Veriler {
 
   double toplamVarlik() => varliklar.fold(0.0, (a, v) => a + varlikDegeri(v));
 
+  /// Cebimdeki para: Varlıklarım'daki nakit ve banka (mevduat) toplamı.
+  double cebimdeki() => varliklar
+      .where((v) => v.s('tur') == 'Nakit' || v.s('tur') == 'Mevduat')
+      .fold(0.0, (a, v) => a + varlikDegeri(v));
+
   // ---------------------------------------------------------------------
   // Maaş
   // ---------------------------------------------------------------------

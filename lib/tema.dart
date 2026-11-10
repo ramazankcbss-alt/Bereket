@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 /// Koyu lacivert, oyun ekranı havasında tema: parlak kartlar, renkli
 /// kabartma butonlar, üstte sayaç hapları.
 class Renk {
-  // Açık tema: krem-beyaz zemin, beyaz kartlar, koyu yazı.
-  static const zemin = Color(0xFFF3F5EF);
-  static const zeminAlt = Color(0xFFEEF1EA);
+  // Açık tema: turkuaz zemin, beyaz kartlar, koyu yazı.
+  static const kurumsal = Color(0xFF0E5E58); // koyu petrol yeşili (logo)
+  static const zemin = Color(0xFFCBEBE6); // açık turkuaz
+  static const zeminAlt = Color(0xFFF1F8F7);
   static const kart = Color(0xFFFFFFFF);
   static const kartAcik = Color(0xFFEEF2F6);
   static const cizgi = Color(0xFFDCE2E8);
@@ -310,38 +311,35 @@ class SayacHapi extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 46,
-        padding: const EdgeInsets.only(left: 4, right: 8),
+        height: 84,
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
         decoration: BoxDecoration(
           color: Renk.kart,
-          borderRadius: BorderRadius.circular(23),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(color: renk, width: 2),
+          boxShadow: const [
+            BoxShadow(color: Color(0x14000000), blurRadius: 8, offset: Offset(0, 2)),
+          ],
         ),
-        child: Row(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(simge, style: const TextStyle(fontSize: 22)),
-            const SizedBox(width: 4),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(deger,
-                        style: const TextStyle(
-                            color: Renk.yazi,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800)),
-                  ),
-                  if (etiket != null)
-                    Text(etiket!,
-                        maxLines: 1,
-                        style: TextStyle(
-                            color: renk, fontSize: 9.5, fontWeight: FontWeight.w700)),
-                ],
-              ),
+            const SizedBox(height: 2),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(deger,
+                  style: const TextStyle(
+                      color: Renk.yazi, fontSize: 17, fontWeight: FontWeight.w900)),
             ),
+            if (etiket != null)
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(etiket!.toUpperCase(),
+                    maxLines: 1,
+                    style: TextStyle(
+                        color: renk, fontSize: 11.5, letterSpacing: 0.5, fontWeight: FontWeight.w900)),
+              ),
           ],
         ),
       ),
@@ -349,7 +347,6 @@ class SayacHapi extends StatelessWidget {
   }
 }
 
-/// İşletmelerim ızgarasındaki renkli kare.
 class Kare extends StatelessWidget {
   const Kare({
     super.key,

@@ -143,6 +143,7 @@ const hesapSimge = <String, String>{
 };
 
 const varlikTurleri = <String, String>{
+  'Nakit': '₺',
   'Altın': 'gram',
   'Döviz': 'adet',
   'Mevduat': '₺',
@@ -151,6 +152,7 @@ const varlikTurleri = <String, String>{
 };
 
 const varlikSimge = <String, String>{
+  'Nakit': '👛',
   'Altın': '🪙',
   'Döviz': '💵',
   'Mevduat': '🏦',

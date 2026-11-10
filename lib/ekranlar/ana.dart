@@ -137,20 +137,22 @@ class AnaSayfa extends StatelessWidget {
           ),
         ),
         const Spacer(),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            gradient: const LinearGradient(colors: [Renk.yesil, Renk.yesilKoyu]),
-            border: Border.all(color: Renk.altin, width: 2.5),
-          ),
-          child: const Text('BEREKET',
-              style: TextStyle(
-                  color: Renk.altin,
-                  fontSize: 26,
-                  letterSpacing: 2,
-                  fontWeight: FontWeight.w900,
-                  shadows: [Shadow(color: Colors.black54, offset: Offset(0, 2))])),
+        const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('BEREKET',
+                style: TextStyle(
+                    color: Renk.kurumsal,
+                    fontSize: 28,
+                    letterSpacing: 6,
+                    fontWeight: FontWeight.w900)),
+            Text('TARIM · FİNANS · AİLE',
+                style: TextStyle(
+                    color: Renk.soluk,
+                    fontSize: 10.5,
+                    letterSpacing: 2.5,
+                    fontWeight: FontWeight.w700)),
+          ],
         ),
         const Spacer(),
         const SizedBox(
@@ -162,45 +164,62 @@ class AnaSayfa extends StatelessWidget {
     );
   }
 
+  /// Bütçem: cebimdeki para ve bu ayın gelir-gideri.
   Widget _profilKarti(BuildContext context, Veriler v) {
-    final i = durum.isletme!;
-    final yil = DateTime.now().year;
-    final buYil = v.ekimler.where((e) => e.t('yil') == yil && Veriler.ekili(e)).toList();
-    final ekili = buYil.fold(0.0, (a, e) => a + v.ekimDekar(e));
-    final hasat = buYil
-        .where((e) => e.s('durum') == 'Hasat edildi')
-        .fold(0.0, (a, e) => a + v.ekimDekar(e));
+    final simdi = DateTime.now();
+    final cep = v.cebimdeki();
+    final ay = v.ayOzeti(simdi.year, simdi.month);
+    final fark = ay.gelir - ay.gider;
+    final girilmedi = !v.varliklar.any((x) => x.s('tur') == 'Nakit' || x.s('tur') == 'Mevduat');
     return Panel(
+      onTap: () => git(context, VarliklarSayfasi(durum: durum)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              const Text('👨‍🌾', style: TextStyle(fontSize: 34)),
+              const Text('👛', style: TextStyle(fontSize: 30)),
               const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(i.ad, maxLines: 1, overflow: TextOverflow.ellipsis, style: yaziKalin),
-                    Text(
-                        '${durum.isim(durum.uid)} · ${durum.yonetici ? 'Sahip' : 'Üye'} · '
-                        '${v.tarlalar.length} parsel, ${sayi(v.toplamDekar)} da',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: yaziSoluk),
-                  ],
-                ),
+              const Expanded(
+                child: Text('CEBİMDEKİ PARA',
+                    style: TextStyle(
+                        color: Renk.soluk,
+                        fontSize: 12.5,
+                        letterSpacing: 1.2,
+                        fontWeight: FontWeight.w800)),
               ),
+              const Icon(Icons.chevron_right, color: Renk.soluk),
             ],
           ),
+          const SizedBox(height: 4),
+          Text(girilmedi ? 'Nakit / banka gir' : tl0(cep),
+              style: TextStyle(
+                  color: girilmedi ? Renk.soluk : Renk.kurumsal,
+                  fontSize: girilmedi ? 18 : 32,
+                  fontWeight: FontWeight.w900)),
+          if (girilmedi)
+            const Text('Varlıklarım\'a "Nakit" ve "Mevduat" olarak elindeki parayı yaz.',
+                style: yaziSoluk),
           const SizedBox(height: 10),
-          Cubuk(
-            oran: ekili > 0 ? hasat / ekili : 0,
-            yazi: ekili <= 0
-                ? '$yil için henüz ekim girilmedi'
-                : '$yil hasat: ${sayi(hasat)} / ${sayi(ekili)} da',
+          Row(
+            children: [
+              Expanded(
+                  child: BilgiKutu(
+                      baslik: '${ayAdi(simdi.month)} gelir', deger: tl0(ay.gelir), renk: Renk.yesil)),
+              const SizedBox(width: 8),
+              Expanded(
+                  child: BilgiKutu(
+                      baslik: '${ayAdi(simdi.month)} gider', deger: tl0(ay.gider), renk: Renk.kirmizi)),
+            ],
           ),
+          const SizedBox(height: 6),
+          Text(
+              fark >= 0
+                  ? 'Bu ay ${tl0(fark)} artıdasın.'
+                  : 'Bu ay ${tl0(-fark)} eksidesin.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  color: fark >= 0 ? Renk.yesilKoyu : Renk.kirmizi, fontWeight: FontWeight.w700)),
         ],
       ),
     );

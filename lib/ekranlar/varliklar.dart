@@ -19,18 +19,21 @@ Future<void> varlikFormu(BuildContext context, Durum durum, {Kayit? varlik}) {
     v: durum.v,
     baslangic: {'tur': 'Altın', 'birim': 'gram', ...?varlik?.d},
     alanlar: [
-      const Alan('tur', 'Türü', tip: AlanTip.secim, secenekler: ['Altın', 'Döviz', 'Mevduat', 'Fon / Hisse', 'Diğer']),
+      const Alan('tur', 'Türü', tip: AlanTip.secim, secenekler: ['Nakit', 'Altın', 'Döviz', 'Mevduat', 'Fon / Hisse', 'Diğer']),
       const Alan('ad', 'Açıklama', ipucu: 'Örn. Gram altın, USD, vadeli hesap'),
       const Alan('miktar', 'Miktar', tip: AlanTip.sayi, zorunlu: true),
       const Alan('birim', 'Birim', oneriler: ['gram', 'çeyrek', 'USD', 'EUR', '₺', 'adet']),
       const Alan('alisTutar', 'Alış tutarı (toplam)', tip: AlanTip.sayi, birim: '₺'),
       Alan('birimFiyat', 'Güncel birim fiyat', tip: AlanTip.sayi, birim: '₺',
           aciklama: 'Altında boş bırakırsanız Ayarlar\'daki gram altın fiyatı kullanılır.',
-          gorunur: (d) => d['tur'] != 'Mevduat'),
+          gorunur: (d) => d['tur'] != 'Mevduat' && d['tur'] != 'Nakit'),
       const Alan('tarih', 'Alış tarihi', tip: AlanTip.tarih),
     ],
     onKaydet: (d) async {
-      if (d['tur'] == 'Mevduat' && (d['birimFiyat'] == null)) d['birimFiyat'] = 1;
+      if ((d['tur'] == 'Mevduat' || d['tur'] == 'Nakit') && (d['birimFiyat'] == null)) {
+        d['birimFiyat'] = 1;
+        d['birim'] = '₺';
+      }
       await durum.kaydet('varliklar', d, id: varlik?.id);
     },
     onSil: varlik == null ? null : () => durum.sil('varliklar', varlik.id),
