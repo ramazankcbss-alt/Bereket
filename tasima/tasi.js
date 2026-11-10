@@ -87,7 +87,7 @@ async function gez(db, koleksiyon, ziyaret) {
 // ---- Bileşik dizinler (eski projede elle oluşturulmuş olabilir) ----------
 async function dizinler(app, proje) {
   const r = await istek(app, 'GET',
-    `https://firestore.googleapis.com/v1/projects/${proje}/databases/(default)/collectionGroups/-/indexes?pageSize=500`);
+    `https://firestore.googleapis.com/v1/projects/${proje}/databases/(default)/collectionGroups/-/indexes`);
   if (!r.ok) throw new Error(`${proje} dizinleri okunamadı: ${r.durum} ${JSON.stringify(r.j).slice(0, 300)}`);
   return (r.j.indexes || []).filter((x) => (x.fields || []).filter((f) => f.fieldPath !== '__name__').length > 1);
 }
