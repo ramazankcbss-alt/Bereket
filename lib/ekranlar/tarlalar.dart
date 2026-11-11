@@ -239,6 +239,9 @@ Future<void> ekimFormu(BuildContext context, Durum durum,
       const Alan('durum', 'Durum', tip: AlanTip.secim, secenekler: ekimDurumlari),
       Alan('ekimTarihi', 'Ekim tarihi', tip: AlanTip.tarih,
           gorunur: (d) => d['durum'] != ekimPlanlaniyor),
+      Alan('verimDekar', 'Dekar başı ürün', tip: AlanTip.sayi, birim: 'kg/da',
+          gorunur: (d) => d['durum'] == 'Hasat edildi',
+          aciklama: 'Yazınca hasat edilen miktar ekilen alanla çarpılıp hesaplanır.'),
       Alan('hasatKg', 'Hasat edilen miktar', tip: AlanTip.sayi, birim: 'kg',
           gorunur: (d) => d['durum'] == 'Hasat edildi',
           aciklama: 'Depoya bu miktar girer.'),
@@ -292,6 +295,23 @@ Future<void> ekimFormu(BuildContext context, Durum durum,
         if (d['farkliAlan'] == true && t != null && (dk is! num || dk <= 0)) {
           final kalan = t.n('dekar') - digerleri(d);
           if (kalan > 0) d['dekar'] = kalan;
+        }
+      }
+      // Hasat = dekar başı ürün × ekilen alan; toplam yazılırsa dekar başı bulunur.
+      if (key == 'verimDekar' || key == 'hasatKg' || key == 'dekar' || key == 'farkliAlan' ||
+          key == 'tarlaId') {
+        final t = v.tarla((d['tarlaId'] ?? '').toString());
+        final alan = d['farkliAlan'] == true
+            ? (d['dekar'] is num ? (d['dekar'] as num).toDouble() : 0.0)
+            : (t?.n('dekar') ?? 0.0);
+        final vd = d['verimDekar'] is num ? (d['verimDekar'] as num).toDouble() : 0.0;
+        final kg = d['hasatKg'] is num ? (d['hasatKg'] as num).toDouble() : 0.0;
+        if (alan > 0) {
+          if (key == 'hasatKg') {
+            if (kg > 0) d['verimDekar'] = double.parse((kg / alan).toStringAsFixed(1));
+          } else if (vd > 0) {
+            d['hasatKg'] = (vd * alan).roundToDouble();
+          }
         }
       }
       // Kira bedeli = dekar fiyatı × ekilen alan.
