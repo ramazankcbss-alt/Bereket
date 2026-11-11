@@ -6,6 +6,7 @@ import '../modeller.dart';
 import '../sabitler.dart';
 import '../servis/idari.dart';
 import '../servis/veri.dart';
+import 'cks.dart';
 import '../tema.dart';
 import 'form.dart';
 import 'kabuk.dart';
@@ -446,33 +447,8 @@ Future<void> neEkeyim(BuildContext context, Durum durum, Kayit tarla) {
   );
 }
 
-/// ÇKS Yükle (Üretim Merkezi'nde).
-void cksBilgi(BuildContext context, Durum durum) {
-  showDialog<void>(
-    context: context,
-    builder: (c) => AlertDialog(
-      title: const Text('ÇKS Yükle'),
-      content: const Text(
-        'ÇKS belgesini (e-Devlet ya da Ziraat Odası çıktısı) otomatik okuma, '
-        'örnek bir belge gönderdiğinizde bir sonraki sürümde eklenecek.\n\n'
-        'Şimdilik parselleri Tarlalarım\'dan "Tarla Ekle" ile girin (ada, parsel, dekar). '
-        'Her yılın ürününü, ÇKS sahibini ve arazi durumunu "Yeni Ekim" ile yazın; '
-        'gelecek yıl için ÇKS\'ye yazdığınız ürün "Ekim planlanıyor" olarak kaydedilir.',
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(c), child: const Text('Tamam')),
-        FilledButton(
-          onPressed: () {
-            Navigator.pop(c);
-            ekimFormu(context, durum,
-                yil: DateTime.now().month >= 8 ? DateTime.now().year + 1 : DateTime.now().year);
-          },
-          child: const Text('Ekim Gir'),
-        ),
-      ],
-    ),
-  );
-}
+/// ÇKS Yükle (Üretim Merkezi'nde): kamera, galeri ya da dosyadan.
+void cksBilgi(BuildContext context, Durum durum) => git(context, CksYukle(durum: durum));
 
 /// Ne Ekeyim? için tarla seçtirir (Üretim Merkezi'nde).
 Future<void> neEkeyimSec(BuildContext context, Durum durum) async {
