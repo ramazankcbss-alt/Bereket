@@ -119,7 +119,7 @@ class _EkipmanSayfasiState extends State<EkipmanSayfasi> {
                               if (e.s('marka').isNotEmpty) e.s('marka'),
                               if (e.t('yil') > 0) '${e.t('yil')}',
                               if (e.s('sahip').isNotEmpty) e.s('sahip'),
-                              if (e.s('tarlaId').isNotEmpty) v.tarlaAdi(e.s('tarlaId')),
+                              if (e.s('tarlaId').isNotEmpty) v.tarlaTam(e.s('tarlaId')),
                               if (e.s('plaka').isNotEmpty) e.s('plaka'),
                             ].join(' · '),
                             style: yaziSoluk),

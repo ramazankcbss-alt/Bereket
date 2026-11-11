@@ -13,7 +13,7 @@ import 'kabuk.dart';
 double _n(Object? v) => v is num ? v.toDouble() : 0;
 
 String ekimEtiketi(Veriler v, Kayit e) =>
-    '${e.t('yil')} · ${e.s('urun')} · ${v.tarlaAdi(e.s('tarlaId'))} (${v.ekimSahipYazisi(e)})';
+    '${e.t('yil')} · ${e.s('urun')} · ${v.tarlaTam(e.s('tarlaId'))} (${v.ekimSahipYazisi(e)})';
 
 /// Kesinti oranlarını satış yerine göre doldurur.
 void _oranlariDoldur(Veriler v, Map<String, dynamic> d) {
@@ -411,7 +411,7 @@ class SatisKarti extends StatelessWidget {
                         [
                           tarih(s.t('tarih')),
                           s.s('yer'),
-                          if (ekim != null) v.tarlaAdi(ekim.s('tarlaId')),
+                          if (ekim != null) v.tarlaTam(ekim.s('tarlaId')),
                           v.satisSahibi(s),
                           if (s.b('sozlesmeli')) 'sözleşmeli',
                           if (s.s('kelesId').isNotEmpty) 'Keleş Satış',

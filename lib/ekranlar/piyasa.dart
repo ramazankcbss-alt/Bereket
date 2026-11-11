@@ -73,7 +73,7 @@ class _PiyasaSayfasiState extends State<PiyasaSayfasi> {
   }
 
   Future<void> _kmGir(Kayit tarla, String yer, double eski) async {
-    final s = await metinSor(context, '${durum.v.tarlaAdi(tarla.id)} → $yer kaç km?',
+    final s = await metinSor(context, '${durum.v.tarlaTam(tarla.id)} → $yer kaç km?',
         baslangic: eski > 0 ? girdi(eski) : '', sayi: true);
     final km = sayiOku(s);
     if (km == null) return;
@@ -213,7 +213,7 @@ class _PiyasaSayfasiState extends State<PiyasaSayfasi> {
                     decoration: const InputDecoration(labelText: 'Ürün hangi tarladan çıkıyor'),
                     items: [
                       for (final t in v.tarlalar)
-                        DropdownMenuItem(value: t.id, child: Text(v.tarlaAdi(t.id))),
+                        DropdownMenuItem(value: t.id, child: Text(v.tarlaTam(t.id))),
                     ],
                     onChanged: (s) => setState(() => _tarlaId = s ?? ''),
                   ),

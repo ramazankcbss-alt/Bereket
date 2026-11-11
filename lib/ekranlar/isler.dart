@@ -97,7 +97,7 @@ class _IslerSayfasiState extends State<IslerSayfasi> {
                         Text(
                             [
                               tarih(x.t('tarih')),
-                              if (x.s('tarlaId').isNotEmpty) v.tarlaAdi(x.s('tarlaId')),
+                              if (x.s('tarlaId').isNotEmpty) v.tarlaTam(x.s('tarlaId')),
                               if (x.s('atanan').isNotEmpty) '👤 ${x.s('atanan')}',
                             ].join(' · '),
                             style: yaziSoluk),

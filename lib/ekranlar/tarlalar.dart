@@ -386,7 +386,7 @@ Future<void> neEkeyim(BuildContext context, Durum durum, Kayit tarla) {
         controller: kontrol,
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
         children: [
-          Text('${v.tarlaAdi(tarla.id)} · $yil için ne ekilsin?', style: yaziKalin),
+          Text('${v.tarlaTam(tarla.id)} · $yil için ne ekilsin?', style: yaziKalin),
           const SizedBox(height: 6),
           Wrap(
             spacing: 6,

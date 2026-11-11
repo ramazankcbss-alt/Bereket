@@ -621,6 +621,14 @@ class _UretimSayfasiState extends State<UretimSayfasi> {
               Text('${sayi(o.dekar)} da', style: const TextStyle(color: Renk.yazi)),
             ],
           ),
+          if (v.tarlaParselSatiri(e.s('tarlaId')).isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text('📍 ${v.tarlaParselSatiri(e.s('tarlaId'))}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Renk.soluk, fontSize: 14, fontWeight: FontWeight.w600)),
+            ),
           const Divider(height: 16),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -857,7 +865,7 @@ class EkimDetay extends StatelessWidget {
                         children: [
                           Text('${e.s('urun')} · ${e.t('yil')}', style: yaziKalin),
                           Text(
-                              '${v.tarlaAdi(e.s('tarlaId'))} · ${sayi(o.dekar)} da · ${v.ekimSahipYazisi(e)}',
+                              '${v.tarlaTam(e.s('tarlaId'))} · ${sayi(o.dekar)} da · ${v.ekimSahipYazisi(e)}',
                               style: yaziSoluk),
                         ],
                       ),

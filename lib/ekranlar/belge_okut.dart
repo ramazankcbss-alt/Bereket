@@ -499,7 +499,7 @@ class _BelgeOkutState extends State<BelgeOkut> {
           children: [
             for (final t in v.tarlalar)
               FilterChip(
-                label: Text('${v.tarlaAdi(t.id)} (${sayi(t.n('dekar'))} da)'),
+                label: Text('${v.tarlaTam(t.id)} (${sayi(t.n('dekar'))} da)'),
                 selected: _tarlalar.contains(t.id),
                 onSelected: (b) => setState(() => b ? _tarlalar.add(t.id) : _tarlalar.remove(t.id)),
               ),

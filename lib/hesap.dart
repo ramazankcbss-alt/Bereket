@@ -95,6 +95,31 @@ class Veriler {
     return ad.isNotEmpty ? ad : '${t.s('ada')}/${t.s('parsel')}';
   }
 
+  /// "1549/10" (ada/parsel); girilmediyse boş.
+  String tarlaParsel(String id) {
+    final t = tarla(id);
+    if (t == null || (t.s('ada').isEmpty && t.s('parsel').isEmpty)) return '';
+    return '${t.s('ada').isEmpty ? '-' : t.s('ada')}/${t.s('parsel').isEmpty ? '-' : t.s('parsel')}';
+  }
+
+  /// Listelerde tarlayı ayırt etmek için: "Devrent yolu · 1549/10".
+  String tarlaTam(String id) {
+    final ad = tarlaAdi(id);
+    final p = tarlaParsel(id);
+    return p.isEmpty || ad == p ? ad : '$ad · $p';
+  }
+
+  /// Parsel satırı: "Ada 1549 · Parsel 10 · Hotamış".
+  String tarlaParselSatiri(String id) {
+    final t = tarla(id);
+    if (t == null) return '';
+    return [
+      if (t.s('ada').isNotEmpty) 'Ada ${t.s('ada')}',
+      if (t.s('parsel').isNotEmpty) 'Parsel ${t.s('parsel')}',
+      if (t.s('mahalle').isNotEmpty) t.s('mahalle'),
+    ].join(' · ');
+  }
+
   double get toplamDekar =>
       tarlalar.fold(0.0, (a, t) => a + t.n('dekar'));
 
@@ -1564,7 +1589,7 @@ class SahipOzet {
             {
               'yil': ekimler[i].ekim.t('yil'),
               'urun': ekimler[i].ekim.s('urun'),
-              'tarla': v.tarlaAdi(ekimler[i].ekim.s('tarlaId')),
+              'tarla': v.tarlaTam(ekimler[i].ekim.s('tarlaId')),
               'dekar': ekimler[i].dekar * paylar[i],
               'pay': paylar[i],
               'masraf': ekimler[i].toplam * paylar[i],

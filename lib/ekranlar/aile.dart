@@ -224,7 +224,7 @@ class _AileSayfasiState extends State<AileSayfasi> {
                       Expanded(
                         child: Text(
                             '${o.ekimler[i].ekim.t('yil')} · ${o.ekimler[i].ekim.s('urun')} · '
-                            '${v.tarlaAdi(o.ekimler[i].ekim.s('tarlaId'))}'
+                            '${v.tarlaTam(o.ekimler[i].ekim.s('tarlaId'))}'
                             '${o.paylar[i] < 0.999 ? ' (%${(o.paylar[i] * 100).round()})' : ''}',
                             style: const TextStyle(color: Renk.yazi)),
                       ),
