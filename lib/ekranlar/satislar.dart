@@ -472,41 +472,150 @@ class _KelesAktarState extends State<KelesAktar> {
     return g is List ? [for (final x in g) x.toString()] : <String>[];
   }
 
+  final Set<String> _secili = {};
+  bool _islem = false;
+
+  /// Ürün adı tutan ekimler (yeni yıl önce).
+  List<Kayit> _uygunEkimler(Veriler v, KelesSiparis k) {
+    final ekimler = [...v.ekimler]..sort((a, b) => b.t('yil').compareTo(a.t('yil')));
+    final ilk = araMetni(k.urun).split(' ').first;
+    return ekimler.where((e) => araMetni(e.s('urun')).contains(ilk)).toList();
+  }
+
+  /// Toplu aktarımda ekim: satış yılındaki aynı ürünlü ekim, yoksa en yakın önceki.
+  Kayit? _otomatikEkim(Veriler v, KelesSiparis k) {
+    final yil = DateTime.fromMillisecondsSinceEpoch(k.tarih).year;
+    final l = _uygunEkimler(v, k).where((e) => e.t('yil') <= yil).toList();
+    if (l.isEmpty) return null;
+    final buYil = l.where((e) => e.t('yil') == yil).toList();
+    // Aynı yıl birden çok tarla varsa tarla belirsiz: tarlasız al.
+    if (buYil.length > 1) return null;
+    return buYil.isNotEmpty ? buYil.first : (l.first.t('yil') == yil - 1 ? l.first : null);
+  }
+
+  Map<String, dynamic> _satisVerisi(KelesSiparis k, Kayit? e) {
+    final i = durum.v.isletme;
+    return {
+      'tur': 'urun',
+      'kelesId': k.id,
+      'ekimId': e?.id ?? '',
+      'tarlaId': e?.s('tarlaId') ?? '',
+      'urun': e?.s('urun') ?? k.urun,
+      'alici': k.musteri,
+      'yer': 'Tüccar',
+      'tarih': k.tarih,
+      'yil': e?.t('yil') ?? DateTime.fromMillisecondsSinceEpoch(k.tarih).year,
+      'kg': k.kg,
+      'fiyat': k.kgFiyat,
+      'tutar': k.tutar,
+      'stopaj': i?.stopajDisi ?? 2,
+      'tescil': 0,
+      'sgk': i?.sgk ?? 2,
+      'tahsilatlar': [
+        if (k.tahsil > 0)
+          {'tur': 'Keleş Satış tahsilatı', 'tutar': k.tahsil, 'banka': '', 't': k.tarih}
+      ],
+    };
+  }
+
+  /// Seçilenleri tek seferde Bereket'e al.
+  Future<void> _topluAl(List<KelesSiparis> secilenler) async {
+    final v = durum.v;
+    final secim = await secimYap(context, '${secilenler.length} satış hangi hasattan?', [
+      'Ürüne göre otomatik eşleştir',
+      'Tarla belirtmeden al',
+    ]);
+    if (secim == null) return;
+    final otomatik = secim.startsWith('Ürüne');
+    setState(() => _islem = true);
+    var n = 0, eslesen = 0;
+    try {
+      final veriler = <Map<String, dynamic>>[];
+      for (final k in secilenler) {
+        final e = otomatik ? _otomatikEkim(v, k) : null;
+        if (e != null) eslesen++;
+        veriler.add(_satisVerisi(k, e));
+      }
+      // 400'erli gruplar hâlinde yaz.
+      for (var i = 0; i < veriler.length; i += 400) {
+        final grup = veriler.sublist(i, i + 400 > veriler.length ? veriler.length : i + 400);
+        await Veri.topluEkle(durum.iid, 'satislar', grup, uid: durum.uid);
+        n += grup.length;
+      }
+      _secili.clear();
+      if (mounted) {
+        bildir(context,
+            '$n satış alındı${otomatik ? ' ($eslesen tanesi tarlasıyla eşleşti)' : ''}.');
+      }
+    } catch (err) {
+      if (mounted) bildir(context, hataYazisi(err));
+    } finally {
+      if (mounted) setState(() => _islem = false);
+    }
+  }
+
+  /// Seçilenleri "Ticari" diye gizle.
+  Future<void> _topluGizle(List<KelesSiparis> secilenler) async {
+    final l = {..._gizli(durum.v), for (final k in secilenler) k.id}.toList();
+    try {
+      await durum.ayarYaz('kelesGizli', l);
+      setState(_secili.clear);
+    } catch (e) {
+      if (mounted) bildir(context, hataYazisi(e));
+    }
+  }
+
+  /// Daha önce alınan satışları Keleş Satış'taki son hâline getirir
+  /// (miktar, fiyat, tahsilat değiştiyse).
+  Future<void> _guncelle(List<(Kayit, KelesSiparis)> degisen) async {
+    setState(() => _islem = true);
+    try {
+      for (final (s, k) in degisen) {
+        final tah = [
+          for (final o in s.liste('tahsilatlar'))
+            if (o['tur'] != 'Keleş Satış tahsilatı') o,
+          if (k.tahsil > 0)
+            {'tur': 'Keleş Satış tahsilatı', 'tutar': k.tahsil, 'banka': '', 't': k.tarih},
+        ];
+        await durum.kaydet(
+            'satislar',
+            {
+              'alici': k.musteri,
+              'kg': k.kg,
+              'fiyat': k.kgFiyat,
+              'tutar': k.tutar,
+              'tahsilatlar': tah,
+            },
+            id: s.id);
+      }
+      if (mounted) bildir(context, '${degisen.length} satış güncellendi.');
+    } catch (err) {
+      if (mounted) bildir(context, hataYazisi(err));
+    } finally {
+      if (mounted) setState(() => _islem = false);
+    }
+  }
+
+  static double _kelesTahsil(Kayit s) {
+    var t = 0.0;
+    for (final o in s.liste('tahsilatlar')) {
+      if (o['tur'] == 'Keleş Satış tahsilatı' && o['tutar'] is num) t += (o['tutar'] as num).toDouble();
+    }
+    return t;
+  }
+
   Future<void> _kendiUrunum(KelesSiparis k) async {
     final v = durum.v;
     final ekimler = [...v.ekimler]..sort((a, b) => b.t('yil').compareTo(a.t('yil')));
-    final uygun = ekimler
-        .where((e) => araMetni(e.s('urun')).contains(araMetni(k.urun).split(' ').first))
-        .toList();
+    final uygun = _uygunEkimler(v, k);
     final liste = uygun.isNotEmpty ? uygun : ekimler;
     final etiketler = {for (final e in liste) ekimEtiketi(v, e): e};
     final secim = await secimYap(context, 'Hangi hasattan satıldı?',
         ['Tarla belirtmeden al', ...etiketler.keys]);
     if (secim == null) return;
     final e = etiketler[secim];
-    final i = v.isletme;
     try {
-      await durum.kaydet('satislar', {
-        'tur': 'urun',
-        'kelesId': k.id,
-        'ekimId': e?.id ?? '',
-        'tarlaId': e?.s('tarlaId') ?? '',
-        'urun': e?.s('urun') ?? k.urun,
-        'alici': k.musteri,
-        'yer': 'Tüccar',
-        'tarih': k.tarih,
-        'yil': e?.t('yil') ?? DateTime.fromMillisecondsSinceEpoch(k.tarih).year,
-        'kg': k.kg,
-        'fiyat': k.kgFiyat,
-        'tutar': k.tutar,
-        'stopaj': i?.stopajDisi ?? 2,
-        'tescil': 0,
-        'sgk': i?.sgk ?? 2,
-        'tahsilatlar': [
-          if (k.tahsil > 0)
-            {'tur': 'Keleş Satış tahsilatı', 'tutar': k.tahsil, 'banka': '', 't': k.tarih}
-        ],
-      });
+      await durum.kaydet('satislar', _satisVerisi(k, e));
       if (mounted) bildir(context, 'Satış Bereket\'e alındı.');
     } catch (err) {
       if (mounted) bildir(context, hataYazisi(err));
@@ -619,9 +728,46 @@ class _KelesAktarState extends State<KelesAktar> {
                   .where((k) => !alinan.contains(k.id))
                   .where((k) => _gizlileriGoster || !gizli.contains(k.id))
                   .toList();
-              return ListView(
+              _secili.removeWhere((id) => !l.any((k) => k.id == id));
+              final secilenler = l.where((k) => _secili.contains(k.id)).toList();
+              // Daha önce alınmış, Keleş'te sonradan değişmiş satışlar.
+              final kMap = {for (final k in snap.data!) k.id: k};
+              final degisen = <(Kayit, KelesSiparis)>[
+                for (final s in v.satislar)
+                  if (kMap[s.s('kelesId')] case final k?)
+                    if ((s.n('kg') - k.kg).abs() > 0.01 ||
+                        (s.n('tutar') - k.tutar).abs() > 0.5 ||
+                        (_kelesTahsil(s) - k.tahsil).abs() > 0.5)
+                      (s, k),
+              ];
+              return Column(
+                children: [
+                  Expanded(
+                    child: ListView(
                 padding: const EdgeInsets.fromLTRB(14, 4, 14, 40),
                 children: [
+                  if (degisen.isNotEmpty)
+                    Panel(
+                      kenarRengi: Renk.turuncu,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text('${degisen.length} satış Keleş Satış\'ta değişmiş', style: yaziKalin),
+                          const Text(
+                              'Daha önce aldığınız satışların miktarı, fiyatı ya da tahsilatı '
+                              'güncellenmiş. Tek dokunuşla Bereket\'e çekin.',
+                              style: yaziSoluk),
+                          const SizedBox(height: 8),
+                          Buton(
+                            yazi: 'Değişenleri Güncelle',
+                            ikon: Icons.sync,
+                            renk: ButonRenk.turuncu,
+                            yukseklik: 44,
+                            onTap: _islem ? null : () => _guncelle(degisen),
+                          ),
+                        ],
+                      ),
+                    ),
                   const Panel(
                     child: Text(
                       'Keleş Satış\'taki satışlar burada listelenir (Bereket yalnızca okur). '
@@ -637,14 +783,43 @@ class _KelesAktarState extends State<KelesAktar> {
                         style: TextStyle(color: Renk.yazi)),
                   ),
                   if (l.isEmpty)
-                    const BosDurum(simge: '✅', yazi: 'Aktarılacak satış kalmadı.'),
+                    const BosDurum(simge: '✅', yazi: 'Aktarılacak satış kalmadı.')
+                  else
+                    CheckboxListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                      value: secilenler.length == l.length
+                          ? true
+                          : (secilenler.isEmpty ? false : null),
+                      tristate: true,
+                      onChanged: (_) => setState(() {
+                        if (secilenler.length == l.length) {
+                          _secili.clear();
+                        } else {
+                          _secili.addAll(l.map((k) => k.id));
+                        }
+                      }),
+                      title: Text('Tümünü seç (${l.length} satış)', style: yaziKalin),
+                      controlAffinity: ListTileControlAffinity.leading,
+                    ),
                   for (final k in l)
                     Panel(
                       padding: const EdgeInsets.all(12),
+                      kenarRengi: _secili.contains(k.id) ? Renk.yesil : null,
+                      onTap: () => setState(() =>
+                          _secili.contains(k.id) ? _secili.remove(k.id) : _secili.add(k.id)),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Text('#${k.no} · ${k.musteri}', style: yaziKalin),
+                          Row(
+                            children: [
+                              Checkbox(
+                                value: _secili.contains(k.id),
+                                onChanged: (b) => setState(
+                                    () => b == true ? _secili.add(k.id) : _secili.remove(k.id)),
+                              ),
+                              Expanded(child: Text('#${k.no} · ${k.musteri}', style: yaziKalin)),
+                            ],
+                          ),
                           Text(
                               '${tarih(k.tarih)} · ${k.urun} · ${sayi(k.miktar)} ${k.birim}'
                               '${k.fiyat > 0 ? ' × ${tl(k.fiyat)}' : ''}',
@@ -674,6 +849,44 @@ class _KelesAktarState extends State<KelesAktar> {
                             ],
                           ),
                         ],
+                      ),
+                    ),
+                ],
+                    ),
+                  ),
+                  if (secilenler.isNotEmpty)
+                    SafeArea(
+                      top: false,
+                      child: Container(
+                        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+                        decoration: const BoxDecoration(
+                          color: Renk.kart,
+                          boxShadow: [BoxShadow(color: Color(0x22000000), blurRadius: 10)],
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: Buton(
+                                yazi: _islem ? 'Aktarılıyor…' : '${secilenler.length} satışı al',
+                                ikon: Icons.download_done,
+                                renk: ButonRenk.yesil,
+                                yukseklik: 48,
+                                onTap: _islem ? null : () => _topluAl(secilenler),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              flex: 2,
+                              child: Buton(
+                                yazi: 'Ticari',
+                                renk: ButonRenk.gri,
+                                yukseklik: 48,
+                                onTap: _islem ? null : () => _topluGizle(secilenler),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                 ],
